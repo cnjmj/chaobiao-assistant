@@ -6,6 +6,8 @@ import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -37,6 +39,9 @@ public class MeterDetailActivity extends AppCompatActivity {
     private RecyclerView recyclerView; private RecordAdapter adapter;
     private TextView tvSummary, tvInfo, tvEmpty; private FloatingActionButton fabAdd;
     private List<Record> recordList = new ArrayList<>();
+    private List<Meter> allMeters = new ArrayList<>();
+    private int currentMeterIndex = 0;
+    private GestureDetector gestureDetector;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState); setContentView(R.layout.activity_meter_detail);
@@ -72,6 +77,78 @@ public class MeterDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_stats).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class).putExtra("meter_id", meterId)));
         findViewById(R.id.btn_edit).setOnClickListener(v -> startActivity(new Intent(this, AddMeterActivity.class).putExtra("edit_id", meterId)));
         findViewById(R.id.btn_export).setOnClickListener(v -> exportRecords());
+
+        // 手势检测：左右滑动切换表计
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            private static final int SWIPE_THRESHOLD = 100;
+            private static final int SWIPE_VELOCITY = 100;
+            @Override public boolean onFling(MotionEvent e1, MotionEvent e2, float vx, float vy) {
+                float dx = e2.getX() - e1.getX();
+                float dy = e2.getY() - e1.getY();
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(vx) > SWIPE_VELOCITY) {
+                    if (dx > 0) {
+                        // 向右滑 → 上一个表计
+                        switchMeter(-1);
+                    } else {
+                        // 向左滑 → 下一个表计
+                        switchMeter(1);
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent ev) {
+        gestureDetector.onTouchEvent(ev);
+        return super.dispatchTouchEvent(ev);
+    }
+
+    /** 切换到上一个/下一个表计 */
+    private void switchMeter(int direction) {
+        if (allMeters.size() <= 1) {
+            Toast.makeText(this, "没有其他表计", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int newIndex = currentMeterIndex + direction;
+        if (newIndex < 0 || newIndex >= allMeters.size()) {
+            Toast.makeText(this, direction < 0 ? "已是第一个表计" : "已是最后一个表计", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        currentMeterIndex = newIndex;
+        meterId = allMeters.get(newIndex).getId();
+        meter = dbHelper.getMeter(meterId);
+        if (meter == null) { finish(); return; }
+        updateMeterInfo();
+        // 重新创建adapter以更新单位
+        adapter = new RecordAdapter(recordList, meter.getUnit(), meter.isPrepaid());
+        adapter.setOnItemClick((r, pos) -> {
+            Intent intent = new Intent(this, RecordDetailActivity.class);
+            intent.putExtra("record_id", r.getId());
+            startActivityForResult(intent, REQ_DETAIL);
+        });
+        adapter.setOnItemLongClick((r, pos) -> {
+            String[] items = {"查看详情", "编辑", "删除"};
+            new AlertDialog.Builder(this).setTitle("操作").setItems(items, (d, which) -> {
+                if (which == 0) { Intent intent = new Intent(this, RecordDetailActivity.class); intent.putExtra("record_id", r.getId()); startActivityForResult(intent, REQ_DETAIL); }
+                else if (which == 1) showEditDialog(r);
+                else if (which == 2) confirmDelete(recordList.get(pos));
+            }).show();
+        });
+        recyclerView.setAdapter(adapter);
+        loadRecords();
+        Toast.makeText(this, meter.getName() + " (" + (newIndex + 1) + "/" + allMeters.size() + ")", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateMeterInfo() {
+        if (meter == null) return;
+        String info = meter.getName() + " | " + meter.getTypeLabel() + " | " + meter.getBillingModeLabel();
+        if (meter.getMeterNo() != null && !meter.getMeterNo().isEmpty()) info += " | 编号 " + meter.getMeterNo();
+        info += " | 单位 " + meter.getUnit();
+        if (allMeters.size() > 1) info += " | " + (currentMeterIndex + 1) + "/" + allMeters.size();
+        tvInfo.setText(info);
+        if (getSupportActionBar() != null) getSupportActionBar().setTitle(meter.getName());
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -80,10 +157,15 @@ public class MeterDetailActivity extends AppCompatActivity {
     }
 
     @Override protected void onResume() {
-        super.onResume(); meter = dbHelper.getMeter(meterId); if (meter == null) { finish(); return; }
-        String info = meter.getName() + " | " + meter.getTypeLabel() + " | " + meter.getBillingModeLabel();
-        if (meter.getMeterNo() != null && !meter.getMeterNo().isEmpty()) info += " | 编号 " + meter.getMeterNo();
-        info += " | 单位 " + meter.getUnit(); tvInfo.setText(info);
+        super.onResume();
+        meter = dbHelper.getMeter(meterId); if (meter == null) { finish(); return; }
+        // 加载所有表计并定位当前索引（用于滑动切换）
+        allMeters = dbHelper.getAllMeters();
+        currentMeterIndex = 0;
+        for (int i = 0; i < allMeters.size(); i++) {
+            if (allMeters.get(i).getId() == meterId) { currentMeterIndex = i; break; }
+        }
+        updateMeterInfo();
         adapter = new RecordAdapter(recordList, meter.getUnit(), meter.isPrepaid());
         adapter.setOnItemClick((r, pos) -> {
             Intent intent = new Intent(this, RecordDetailActivity.class);
