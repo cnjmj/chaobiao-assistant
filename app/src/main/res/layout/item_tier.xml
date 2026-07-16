@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="4dp" android:gravity="center_vertical">
+    <EditText android:id="@+id/et_start" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:hint="起始" android:inputType="numberDecimal" android:textSize="13sp" android:background="@android:color/white" android:padding="4dp" android:layout_marginEnd="4dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textSize="14sp"/>
+    <EditText android:id="@+id/et_end" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:hint="终止/无穷" android:inputType="text" android:textSize="13sp" android:background="@android:color/white" android:padding="4dp" android:layout_marginStart="4dp" android:layout_marginEnd="4dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=":" android:textSize="14sp"/>
+    <EditText android:id="@+id/et_price" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1.2" android:hint="单价" android:inputType="numberDecimal" android:textSize="13sp" android:background="@android:color/white" android:padding="4dp" android:layout_marginStart="4dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="元" android:textSize="11sp" android:textColor="#999999"/>
+</LinearLayout>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_margin="3dp" app:cardCornerRadius="6dp" app:cardElevation="1.5dp" app:cardUseCompatPadding="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="10dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/tv_index" android:layout_width="28dp" android:layout_height="28dp" android:gravity="center" android:textSize="12sp" android:textColor="#FFFFFF" android:background="@drawable/bg_index_circle" android:layout_marginEnd="10dp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/tv_balance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textColor="#333333" android:textStyle="bold"/>
+            <TextView android:id="@+id/tv_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="#999999" android:layout_marginTop="1dp"/>
+            <TextView android:id="@+id/tv_note" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#888888" android:visibility="gone"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
+            <TextView android:id="@+id/tv_usage_diff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="14sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tv_cost_diff" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#888888" android:layout_marginTop="1dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

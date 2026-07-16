@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#F5F5F5">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <com.google.android.material.appbar.AppBarLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+        <androidx.appcompat.widget.Toolbar android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="?attr/colorPrimary" app:title="记录详情" app:titleTextColor="@android:color/white"/>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.cardview.widget.CardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_margin="12dp" app:cardCornerRadius="8dp" app:cardElevation="2dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+            <TextView android:id="@+id/tv_type" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#FFFFFF" android:background="#009688" android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="2dp" android:paddingBottom="2dp" android:layout_marginBottom="12dp"/>
+            <TextView android:id="@+id/tv_time_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="时间" android:textSize="12sp" android:textColor="#999999"/>
+            <TextView android:id="@+id/tv_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textColor="#333333" android:layout_marginBottom="10dp"/>
+            <TextView android:id="@+id/tv_balance_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999"/>
+            <TextView android:id="@+id/tv_balance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="20sp" android:textColor="#333333" android:textStyle="bold" android:layout_marginBottom="10dp"/>
+            <TextView android:id="@+id/tv_reading_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" android:visibility="gone"/>
+            <TextView android:id="@+id/tv_reading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textColor="#333333" android:layout_marginBottom="10dp" android:visibility="gone"/>
+            <LinearLayout android:id="@+id/layout_diff" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="10dp" android:visibility="gone">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:textColor="#999999" android:text="用量"/>
+                <TextView android:id="@+id/tv_usage" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:textColor="#009688" android:textStyle="bold"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:textColor="#999999" android:text="费用"/>
+                <TextView android:id="@+id/tv_cost" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:textColor="#FF7043" android:textStyle="bold"/>
+            </LinearLayout>
+            <TextView android:id="@+id/tv_note_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" android:visibility="gone"/>
+            <TextView android:id="@+id/tv_note" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="15sp" android:textColor="#666666" android:visibility="gone"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingStart="12dp" android:paddingEnd="12dp">
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_edit" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="编辑" android:textColor="?attr/colorPrimary" android:layout_marginEnd="6dp"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_delete" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="删除" android:backgroundTint="#FF5252" android:textColor="@android:color/white" android:layout_marginStart="6dp"/>
+    </LinearLayout>
+</LinearLayout>
+</ScrollView>

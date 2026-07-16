@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <Spinner android:id="@+id/spn_record_type"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView android:id="@+id/tv_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#888888"
+        android:paddingBottom="8dp"
+        android:visibility="gone"/>
+
+    <!-- 补录开关 -->
+    <LinearLayout
+        android:id="@+id/layout_backdate_toggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="4dp">
+        <CheckBox android:id="@+id/cb_backdate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="补录（自定义时间）"
+            android:textSize="14sp"
+            android:textColor="#FF7043"/>
+    </LinearLayout>
+
+    <!-- 补录日期时间选择区 -->
+    <LinearLayout android:id="@+id/layout_backdate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:paddingBottom="8dp">
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="日期"
+            android:layout_marginEnd="4dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_backdate_date"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:focusable="false"
+                android:inputType="none"/>
+        </com.google.android.material.textfield.TextInputLayout>
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="时间"
+            android:layout_marginStart="4dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_backdate_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:focusable="false"
+                android:inputType="none"/>
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
+
+    <!-- 预付费：余额为主 -->
+    <LinearLayout android:id="@+id/layout_prepaid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="余额（元）"
+            android:layout_marginBottom="8dp">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_balance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:inputType="numberDecimal"/>
+        </com.google.android.material.textfield.TextInputLayout>
+        <TextView android:id="@+id/tv_reading_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="同时录入用量 >"
+            android:textSize="13sp"
+            android:textColor="#009688"
+            android:paddingBottom="4dp"
+            android:visibility="gone"/>
+        <com.google.android.material.textfield.TextInputLayout android:id="@+id/til_reading_optional"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="当期用量"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_reading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:inputType="numberDecimal"/>
+        </com.google.android.material.textfield.TextInputLayout>
+        <CheckBox android:id="@+id/cb_reading_cumulative"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="作为累计值（需计算差值）"
+            android:textSize="13sp"
+            android:textColor="#FF7043"
+            android:visibility="gone"
+            android:paddingBottom="4dp"/>
+    </LinearLayout>
+
+    <!-- 后付费：读数为主 -->
+    <LinearLayout android:id="@+id/layout_postpaid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="当前读数"
+            android:layout_marginBottom="4dp">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_reading_main"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:inputType="numberDecimal"/>
+        </com.google.android.material.textfield.TextInputLayout>
+        <CheckBox android:id="@+id/cb_reading_cumulative_post"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="作为累计值（需计算差值）"
+            android:textSize="13sp"
+            android:textColor="#FF7043"
+            android:checked="true"
+            android:paddingBottom="4dp"/>
+    </LinearLayout>
+
+    <!-- 充值 -->
+    <com.google.android.material.textfield.TextInputLayout android:id="@+id/til_recharge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="充值金额（元）"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+        <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_recharge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:inputType="numberDecimal"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="备注（选填）">
+        <com.google.android.material.textfield.TextInputEditText android:id="@+id/et_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"/>
+    </com.google.android.material.textfield.TextInputLayout>
+</LinearLayout>

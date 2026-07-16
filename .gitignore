@@ -1,0 +1,14 @@
+﻿*.apk
+*.aab
+*.class
+*.dex
+*.jar
+!gradle-wrapper.jar
+local.properties
+.idea/
+.gradle/
+build/
+app/build/
+*.iml
+*.log
+hs_err_*

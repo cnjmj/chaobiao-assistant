@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+    <!-- === 仪表盘（左上区域）=== -->
+    <!-- 外圈 -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="2.5"
+        android:pathData="M38,36 A18,18 0 1,1 37.99,36 Z"/>
+    <!-- 内圈装饰 -->
+    <path android:fillColor="#00000000" android:strokeColor="#B2DFDB" android:strokeWidth="1"
+        android:pathData="M38,40 A14,14 0 1,1 37.99,40 Z"/>
+
+    <!-- 刻度线（8个方向） -->
+    <path android:fillColor="#FFFFFF" android:pathData="M38,19 L38,23"/>  <!-- 12点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M50.73,23.27 L48.73,25.97"/>  <!-- 1:30 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M55,36 L51,36"/>  <!-- 3点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M50.73,48.73 L48.73,46.03"/>  <!-- 4:30 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M38,53 L38,49"/>  <!-- 6点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M25.27,48.73 L27.27,46.03"/>  <!-- 7:30 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M21,36 L25,36"/>  <!-- 9点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M25.27,23.27 L27.27,25.97"/>  <!-- 10:30 -->
+
+    <!-- 指针（指向约2/3位置，偏右下） -->
+    <path android:fillColor="#FF7043" android:pathData="M38,36 L50,28 L38,34.5 Z"/>
+    <!-- 中心圆点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M36,34 A2,2 0 1,0 40,34 A2,2 0 1,0 36,34 Z"/>
+
+    <!-- === 记录笔（右上区域）=== -->
+    <!-- 笔身 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M72,20 L80,28 L68,40 L60,32 Z"/>
+    <!-- 笔尖 -->
+    <path android:fillColor="#FF7043" android:pathData="M60,32 L68,40 L64,44 L56,36 Z"/>
+    <!-- 笔尖点 -->
+    <path android:fillColor="#FF7043" android:pathData="M63.5,43.5 A1.5,1.5 0 1,0 66.5,43.5 A1.5,1.5 0 1,0 63.5,43.5 Z"/>
+
+    <!-- === 记录横线（中间区域，模拟账本行）=== -->
+    <path android:fillColor="#B2DFDB" android:pathData="M24,56 h60 v1.5 h-60z"/>
+    <path android:fillColor="#80CBC4" android:pathData="M24,62 h50 v1.5 h-50z"/>
+    <path android:fillColor="#4DB6AC" android:pathData="M24,68 h40 v1.5 h-40z"/>
+    <!-- 小数字装饰 -->
+    <path android:fillColor="#B2DFDB" android:pathData="M24,56 h8 v5.5 h-8z"/>
+
+    <!-- === 柱状图（右下区域）=== -->
+    <!-- 柱子 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M68,78 v14 h4 v-14z"/>
+    <path android:fillColor="#80CBC4" android:pathData="M74,72 v20 h4 v-20z"/>
+    <path android:fillColor="#4DB6AC" android:pathData="M80,82 v10 h4 v-10z"/>
+    <path android:fillColor="#B2DFDB" android:pathData="M86,76 v16 h4 v-16z"/>
+    <!-- 基线 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M66,92 h26 v1 h-26z"/>
+
+</vector>

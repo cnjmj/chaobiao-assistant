@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#F5F5F5">
+    <com.google.android.material.appbar.AppBarLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+        <androidx.appcompat.widget.Toolbar android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="?attr/colorPrimary" app:title="表计详情" app:titleTextColor="@android:color/white"/>
+    </com.google.android.material.appbar.AppBarLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        <TextView android:id="@+id/tv_meter_info" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="10dp" android:background="@android:color/white" android:textSize="13sp" android:textColor="#666666" android:elevation="2dp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="4dp" android:background="@android:color/white">
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_stats" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="统计图表" android:textColor="?attr/colorPrimary" android:textSize="13sp"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_edit" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="编辑表计" android:textColor="#666666" android:textSize="13sp"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_export" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="导出" android:textColor="#FF7043" android:textSize="13sp"/>
+        </LinearLayout>
+        <TextView android:id="@+id/tv_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="10dp" android:background="#E3F2FD" android:textSize="13sp" android:textColor="#1565C0" android:elevation="1dp" android:visibility="gone"/>
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recycler_view" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:padding="4dp" android:clipToPadding="false"/>
+        <TextView android:id="@+id/tv_empty" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center" android:text="暂无记录\n点击 + 记录余额" android:textSize="16sp" android:textColor="#999999" android:visibility="gone"/>
+    </LinearLayout>
+    <com.google.android.material.floatingactionbutton.FloatingActionButton android:id="@+id/fab_add" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|end" android:layout_margin="24dp" android:src="@android:drawable/ic_input_add" app:backgroundTint="?attr/colorPrimary" app:tint="@android:color/white"/>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

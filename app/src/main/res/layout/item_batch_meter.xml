@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@android:color/white" android:padding="12dp" android:layout_marginBottom="6dp" android:elevation="1dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/tv_type_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#FFFFFF" android:background="#009688" android:paddingStart="6dp" android:paddingEnd="6dp" android:paddingTop="2dp" android:paddingBottom="2dp" android:layout_marginEnd="8dp"/>
+        <TextView android:id="@+id/tv_meter_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="15sp" android:textColor="#333333" android:textStyle="bold"/>
+        <Spinner android:id="@+id/spn_action" android:layout_width="wrap_content" android:layout_height="wrap_content" android:spinnerMode="dropdown"/>
+    </LinearLayout>
+    <TextView android:id="@+id/tv_billing_mode" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="#AAAAAA" android:layout_marginTop="2dp"/>
+    <TextView android:id="@+id/tv_last_info" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" android:layout_marginTop="2dp"/>
+
+    <!-- 预付费抄表：余额+可选用量 -->
+    <LinearLayout android:id="@+id/layout_prepaid_reading" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="余额：" android:textSize="14sp" android:textColor="#666666"/>
+            <EditText android:id="@+id/et_balance" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="numberDecimal" android:textSize="14sp" android:hint="元" android:background="@android:drawable/edit_text" android:padding="6dp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="元" android:textSize="12sp" android:textColor="#999999" android:layout_marginStart="4dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp" android:gravity="center_vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="用量：" android:textSize="13sp" android:textColor="#AAAAAA"/>
+            <EditText android:id="@+id/et_reading" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="numberDecimal" android:textSize="13sp" android:hint="选填" android:background="@android:drawable/edit_text" android:padding="6dp"/>
+            <TextView android:id="@+id/tv_unit_reading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" android:layout_marginStart="4dp"/>
+        </LinearLayout>
+        <CheckBox android:id="@+id/cb_cumulative_pre" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="作为累计值" android:textSize="12sp" android:textColor="#FF7043"/>
+    </LinearLayout>
+
+    <!-- 后付费抄表：读数 -->
+    <LinearLayout android:id="@+id/layout_postpaid_reading" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="当前读数：" android:textSize="14sp" android:textColor="#666666"/>
+            <EditText android:id="@+id/et_reading_main" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="numberDecimal" android:textSize="14sp" android:hint="输入读数" android:background="@android:drawable/edit_text" android:padding="6dp"/>
+            <TextView android:id="@+id/tv_unit_main" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" android:layout_marginStart="4dp"/>
+        </LinearLayout>
+        <CheckBox android:id="@+id/cb_cumulative_post" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="作为累计值" android:textSize="12sp" android:textColor="#FF7043" android:checked="true"/>
+    </LinearLayout>
+
+    <!-- 充值 -->
+    <LinearLayout android:id="@+id/layout_recharge" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="充值金额：" android:textSize="14sp" android:textColor="#666666"/>
+        <EditText android:id="@+id/et_recharge" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="numberDecimal" android:textSize="14sp" android:hint="元" android:background="@android:drawable/edit_text" android:padding="6dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="元" android:textSize="12sp" android:textColor="#999999" android:layout_marginStart="4dp"/>
+    </LinearLayout>
+</LinearLayout>
