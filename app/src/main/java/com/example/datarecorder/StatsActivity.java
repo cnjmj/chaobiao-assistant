@@ -82,13 +82,11 @@ public class StatsActivity extends AppCompatActivity {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
 
-        // 按日期(yyyy-MM-dd)汇总原始数据
         SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
         SimpleDateFormat labelFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
-        // 用 yyyy-MM-dd 做内部key，保证排序正确
+
+        // 按日期(yyyy-MM-dd)汇总原始数据
         TreeMap<String, Double> rawUsage = new TreeMap<>(), rawCost = new TreeMap<>();
-        // 同时记录每个日期的label(_MM/dd格式)
-        TreeMap<String, String> dateLabelMap = new TreeMap<>();
 
         Calendar cal = Calendar.getInstance();
         for (int i = allRecs.size() - 1; i >= 0; i--) {
@@ -96,9 +94,6 @@ public class StatsActivity extends AppCompatActivity {
             cal.setTimeInMillis(r.getTimestamp());
             if (year > 0 && cal.get(Calendar.YEAR) != year) continue;
             String dateKey = dateFmt.format(r.getTimestamp());
-            if (!dateLabelMap.containsKey(dateKey)) {
-                dateLabelMap.put(dateKey, labelFmt.format(r.getTimestamp()));
-            }
             if (r.getUsageDiff() > 0) {
                 Double p = rawUsage.get(dateKey);
                 rawUsage.put(dateKey, (p != null ? p : 0) + r.getUsageDiff());
@@ -108,7 +103,6 @@ public class StatsActivity extends AppCompatActivity {
                 rawCost.put(dateKey, (p != null ? p : 0) + r.getCostDiff());
             }
         }
-        if (dateLabelMap.isEmpty()) return;
 
         // 确定日期范围：最近30天
         Calendar today = Calendar.getInstance();
@@ -117,40 +111,37 @@ public class StatsActivity extends AppCompatActivity {
         Calendar startCal = (Calendar) today.clone();
         startCal.add(Calendar.DAY_OF_MONTH, -29); // 含今天共30天
 
-        // 生成连续30天日期列表
-        ArrayList<String> allDates = new ArrayList<>();
-        ArrayList<String> allLabels = new ArrayList<>();
+        // 生成连续30天日期列表（内部key和显示label分开存储）
+        ArrayList<String> allDateKeys = new ArrayList<>();  // yyyy-MM-dd，用于查找rawUsage/rawCost
+        ArrayList<String> allLabels = new ArrayList<>();     // MM/dd，用于图表X轴显示
         Calendar cur = (Calendar) startCal.clone();
         while (!cur.after(today)) {
-            String dk = dateFmt.format(cur.getTime());
-            String lb = labelFmt.format(cur.getTime());
-            allDates.add(dk);
-            allLabels.add(lb);
+            allDateKeys.add(dateFmt.format(cur.getTime()));
+            allLabels.add(labelFmt.format(cur.getTime()));
             cur.add(Calendar.DAY_OF_MONTH, 1);
         }
 
         // 插值：找出有数据的日期及其索引
         ArrayList<Integer> dataIndices = new ArrayList<>();
-        for (int i = 0; i < allDates.size(); i++) {
-            if (rawUsage.containsKey(allDates.get(i)) || rawCost.containsKey(allDates.get(i))) {
+        for (int i = 0; i < allDateKeys.size(); i++) {
+            if (rawUsage.containsKey(allDateKeys.get(i)) || rawCost.containsKey(allDateKeys.get(i))) {
                 dataIndices.add(i);
             }
         }
 
-        // 用线性插值填补缺失日期
+        // 用线性插值填补缺失日期，key用label格式(MM/dd)与allLabels一致
         LinkedHashMap<String, Double> dayUsage = new LinkedHashMap<>(), dayCost = new LinkedHashMap<>();
-        for (int i = 0; i < allDates.size(); i++) {
-            String dk = allDates.get(i);
+        for (int i = 0; i < allDateKeys.size(); i++) {
+            String dk = allDateKeys.get(i);
+            String label = allLabels.get(i);
             if (rawUsage.containsKey(dk) || rawCost.containsKey(dk)) {
-                // 该日有实际数据
-                dayUsage.put(dk, rawUsage.containsKey(dk) ? rawUsage.get(dk) : 0.0);
-                dayCost.put(dk, rawCost.containsKey(dk) ? rawCost.get(dk) : 0.0);
+                dayUsage.put(label, rawUsage.containsKey(dk) ? rawUsage.get(dk) : 0.0);
+                dayCost.put(label, rawCost.containsKey(dk) ? rawCost.get(dk) : 0.0);
             } else {
-                // 该日无数据，进行插值
-                double iu = interpolateValue(i, dataIndices, allDates, rawUsage);
-                double ic = interpolateValue(i, dataIndices, allDates, rawCost);
-                dayUsage.put(dk, iu);
-                dayCost.put(dk, ic);
+                double iu = interpolateValue(i, dataIndices, allDateKeys, rawUsage);
+                double ic = interpolateValue(i, dataIndices, allDateKeys, rawCost);
+                dayUsage.put(label, iu);
+                dayCost.put(label, ic);
             }
         }
 
@@ -158,24 +149,18 @@ public class StatsActivity extends AppCompatActivity {
     }
 
     /** 对缺失日期进行线性插值：差值/间隔天数取平均 */
-    private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDates, TreeMap<String, Double> rawData) {
-        // 找到缺失位置前后的有数据索引
+    private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         int prevIdx = -1, nextIdx = -1;
         for (int di : dataIndices) {
             if (di <= missingIdx) prevIdx = di;
             if (di >= missingIdx && nextIdx < 0) nextIdx = di;
         }
-        // 如果前面没有数据，用后面那天的值
-        if (prevIdx < 0 && nextIdx >= 0) return rawData.containsKey(allDates.get(nextIdx)) ? rawData.get(allDates.get(nextIdx)) : 0.0;
-        // 如果后面没有数据，用前面那天的值
-        if (nextIdx < 0 && prevIdx >= 0) return rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
-        // 前后都没有数据
+        if (prevIdx < 0 && nextIdx >= 0) return rawData.containsKey(allDateKeys.get(nextIdx)) ? rawData.get(allDateKeys.get(nextIdx)) : 0.0;
+        if (nextIdx < 0 && prevIdx >= 0) return rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
         if (prevIdx < 0) return 0.0;
-        // 同一天
-        if (prevIdx == nextIdx) return rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
-        // 线性插值：差值 / 间隔天数
-        double prevVal = rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
-        double nextVal = rawData.containsKey(allDates.get(nextIdx)) ? rawData.get(allDates.get(nextIdx)) : 0.0;
+        if (prevIdx == nextIdx) return rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
+        double prevVal = rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
+        double nextVal = rawData.containsKey(allDateKeys.get(nextIdx)) ? rawData.get(allDateKeys.get(nextIdx)) : 0.0;
         int gap = nextIdx - prevIdx;
         if (gap == 0) return prevVal;
         return prevVal + (nextVal - prevVal) * (missingIdx - prevIdx) / gap;
