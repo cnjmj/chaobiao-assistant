@@ -20,6 +20,7 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -80,25 +81,104 @@ public class StatsActivity extends AppCompatActivity {
     private void updateDaily(int year) {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
-        Calendar cal = Calendar.getInstance();
-        // 按日汇总: key = "MM/dd"
-        TreeMap<String, Double> dayUsage = new TreeMap<>(), dayCost = new TreeMap<>();
-        TreeMap<String, String> daySortKey = new TreeMap<>(); // for proper date sorting
-        SimpleDateFormat keyFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
-        SimpleDateFormat sortFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
 
-        for (int i = allRecs.size()-1; i >= 0; i--) {
-            Record r = allRecs.get(i); cal.setTimeInMillis(r.getTimestamp());
+        // 按日期(yyyy-MM-dd)汇总原始数据
+        SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
+        SimpleDateFormat labelFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
+        // 用 yyyy-MM-dd 做内部key，保证排序正确
+        TreeMap<String, Double> rawUsage = new TreeMap<>(), rawCost = new TreeMap<>();
+        // 同时记录每个日期的label(_MM/dd格式)
+        TreeMap<String, String> dateLabelMap = new TreeMap<>();
+
+        Calendar cal = Calendar.getInstance();
+        for (int i = allRecs.size() - 1; i >= 0; i--) {
+            Record r = allRecs.get(i);
+            cal.setTimeInMillis(r.getTimestamp());
             if (year > 0 && cal.get(Calendar.YEAR) != year) continue;
-            String key = keyFmt.format(r.getTimestamp());
-            String sortK = sortFmt.format(r.getTimestamp());
-            daySortKey.put(sortK, key);
-            if (r.getUsageDiff() > 0) { Double p = dayUsage.get(key); dayUsage.put(key, (p!=null?p:0)+r.getUsageDiff()); }
-            if (r.getCostDiff() > 0) { Double p = dayCost.get(key); dayCost.put(key, (p!=null?p:0)+r.getCostDiff()); }
+            String dateKey = dateFmt.format(r.getTimestamp());
+            if (!dateLabelMap.containsKey(dateKey)) {
+                dateLabelMap.put(dateKey, labelFmt.format(r.getTimestamp()));
+            }
+            if (r.getUsageDiff() > 0) {
+                Double p = rawUsage.get(dateKey);
+                rawUsage.put(dateKey, (p != null ? p : 0) + r.getUsageDiff());
+            }
+            if (r.getCostDiff() > 0) {
+                Double p = rawCost.get(dateKey);
+                rawCost.put(dateKey, (p != null ? p : 0) + r.getCostDiff());
+            }
         }
-        ArrayList<String> labels = new ArrayList<>(); for (String k : daySortKey.values()) if (!labels.contains(k)) labels.add(k);
-        if (labels.isEmpty()) return;
-        buildChartsAndTable(labels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
+        if (dateLabelMap.isEmpty()) return;
+
+        // 确定日期范围：最近30天
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0); today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0); today.set(Calendar.MILLISECOND, 0);
+        Calendar startCal = (Calendar) today.clone();
+        startCal.add(Calendar.DAY_OF_MONTH, -29); // 含今天共30天
+
+        // 生成连续30天日期列表
+        ArrayList<String> allDates = new ArrayList<>();
+        ArrayList<String> allLabels = new ArrayList<>();
+        Calendar cur = (Calendar) startCal.clone();
+        while (!cur.after(today)) {
+            String dk = dateFmt.format(cur.getTime());
+            String lb = labelFmt.format(cur.getTime());
+            allDates.add(dk);
+            allLabels.add(lb);
+            cur.add(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        // 插值：找出有数据的日期及其索引
+        ArrayList<Integer> dataIndices = new ArrayList<>();
+        for (int i = 0; i < allDates.size(); i++) {
+            if (rawUsage.containsKey(allDates.get(i)) || rawCost.containsKey(allDates.get(i))) {
+                dataIndices.add(i);
+            }
+        }
+
+        // 用线性插值填补缺失日期
+        LinkedHashMap<String, Double> dayUsage = new LinkedHashMap<>(), dayCost = new LinkedHashMap<>();
+        for (int i = 0; i < allDates.size(); i++) {
+            String dk = allDates.get(i);
+            if (rawUsage.containsKey(dk) || rawCost.containsKey(dk)) {
+                // 该日有实际数据
+                dayUsage.put(dk, rawUsage.containsKey(dk) ? rawUsage.get(dk) : 0.0);
+                dayCost.put(dk, rawCost.containsKey(dk) ? rawCost.get(dk) : 0.0);
+            } else {
+                // 该日无数据，进行插值
+                double iu = interpolateValue(i, dataIndices, allDates, rawUsage);
+                double ic = interpolateValue(i, dataIndices, allDates, rawCost);
+                dayUsage.put(dk, iu);
+                dayCost.put(dk, ic);
+            }
+        }
+
+        buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
+    }
+
+    /** 对缺失日期进行线性插值：差值/间隔天数取平均 */
+    private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDates, TreeMap<String, Double> rawData) {
+        // 找到缺失位置前后的有数据索引
+        int prevIdx = -1, nextIdx = -1;
+        for (int di : dataIndices) {
+            if (di <= missingIdx) prevIdx = di;
+            if (di >= missingIdx && nextIdx < 0) nextIdx = di;
+        }
+        // 如果前面没有数据，用后面那天的值
+        if (prevIdx < 0 && nextIdx >= 0) return rawData.containsKey(allDates.get(nextIdx)) ? rawData.get(allDates.get(nextIdx)) : 0.0;
+        // 如果后面没有数据，用前面那天的值
+        if (nextIdx < 0 && prevIdx >= 0) return rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
+        // 前后都没有数据
+        if (prevIdx < 0) return 0.0;
+        // 同一天
+        if (prevIdx == nextIdx) return rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
+        // 线性插值：差值 / 间隔天数
+        double prevVal = rawData.containsKey(allDates.get(prevIdx)) ? rawData.get(allDates.get(prevIdx)) : 0.0;
+        double nextVal = rawData.containsKey(allDates.get(nextIdx)) ? rawData.get(allDates.get(nextIdx)) : 0.0;
+        int gap = nextIdx - prevIdx;
+        if (gap == 0) return prevVal;
+        return prevVal + (nextVal - prevVal) * (missingIdx - prevIdx) / gap;
     }
 
     private void updateMonthly(int year) {
@@ -119,7 +199,7 @@ public class StatsActivity extends AppCompatActivity {
         buildChartsAndTable(labels, mUsage, mCost, "月用量趋势 (" + meter.getUnit() + ")", "月费用趋势 (元)");
     }
 
-    private void buildChartsAndTable(ArrayList<String> labels, TreeMap<String, Double> usageMap, TreeMap<String, Double> costMap, String usageTitle, String costTitle) {
+    private void buildChartsAndTable(ArrayList<String> labels, Map<String, Double> usageMap, Map<String, Double> costMap, String usageTitle, String costTitle) {
         double totalU = 0, totalC = 0;
         // 用量曲线
         ArrayList<Entry> uEntries = new ArrayList<>();
@@ -166,7 +246,7 @@ public class StatsActivity extends AppCompatActivity {
         chart.animateX(800); chart.invalidate();
     }
 
-    private void buildTable(ArrayList<String> labels, TreeMap<String,Double> uMap, TreeMap<String,Double> cMap, double totalU, double totalC) {
+    private void buildTable(ArrayList<String> labels, Map<String,Double> uMap, Map<String,Double> cMap, double totalU, double totalC) {
         tableContainer.removeAllViews();
         View header = getLayoutInflater().inflate(R.layout.item_table_row, null);
         String periodLabel = currentMode == 0 ? "日期" : "月份";
