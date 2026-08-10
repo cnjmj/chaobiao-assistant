@@ -137,20 +137,26 @@ public class StatsActivity extends AppCompatActivity {
         }
         if (rawUsage.isEmpty() && rawCost.isEmpty()) return;
 
-        // 生成连续日期列表
-        Calendar startCal = Calendar.getInstance(); startCal.setTimeInMillis(rangeStartMs);
-        Calendar endCal = Calendar.getInstance(); endCal.setTimeInMillis(rangeEndMs);
-
+        // 日期范围：从首个有数据的日期到末个有数据的日期（两端不延伸）
         ArrayList<String> allDateKeys = new ArrayList<>();
         ArrayList<String> allLabels = new ArrayList<>();
-        Calendar cur = (Calendar) startCal.clone();
-        while (!cur.after(endCal)) {
-            allDateKeys.add(dateFmt.format(cur.getTime()));
-            allLabels.add(labelFmt.format(cur.getTime()));
-            cur.add(Calendar.DAY_OF_MONTH, 1);
-        }
+        // 合并两个TreeMap的key来找到首末日期
+        String firstDate = rawUsage.isEmpty() ? rawCost.firstKey() : (rawCost.isEmpty() ? rawUsage.firstKey() : rawUsage.firstKey().compareTo(rawCost.firstKey()) <= 0 ? rawUsage.firstKey() : rawCost.firstKey());
+        String lastDate = rawUsage.isEmpty() ? rawCost.lastKey() : (rawCost.isEmpty() ? rawUsage.lastKey() : rawUsage.lastKey().compareTo(rawCost.lastKey()) >= 0 ? rawUsage.lastKey() : rawCost.lastKey());
+        try {
+            Calendar startCal = Calendar.getInstance();
+            startCal.setTimeInMillis(dateFmt.parse(firstDate).getTime());
+            Calendar endCal = Calendar.getInstance();
+            endCal.setTimeInMillis(dateFmt.parse(lastDate).getTime());
+            Calendar cur = (Calendar) startCal.clone();
+            while (!cur.after(endCal)) {
+                allDateKeys.add(dateFmt.format(cur.getTime()));
+                allLabels.add(labelFmt.format(cur.getTime()));
+                cur.add(Calendar.DAY_OF_MONTH, 1);
+            }
+        } catch (Exception e) { return; }
 
-        // 插值
+        // 插值：仅对两端数据之间的缺失日期线性插值
         ArrayList<Integer> dataIndices = new ArrayList<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             if (rawUsage.containsKey(allDateKeys.get(i)) || rawCost.containsKey(allDateKeys.get(i))) {
@@ -173,7 +179,7 @@ public class StatsActivity extends AppCompatActivity {
         buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
     }
 
-    /** 插值：首条数据之前按日均分摊，中间线性插值，末条之后保持 */
+    /** 插值：仅对两个数据点之间的缺失日期线性插值，两端不处理 */
     private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         int prevIdx = -1, nextIdx = -1;
         for (int di : dataIndices) {
@@ -181,21 +187,8 @@ public class StatsActivity extends AppCompatActivity {
             if (di >= missingIdx && nextIdx < 0) nextIdx = di;
         }
 
-        // 在首个数据点之前：按日均分摊
-        if (prevIdx < 0 && nextIdx >= 0) {
-            double firstVal = valAt(allDateKeys, nextIdx, rawData);
-            // 从范围起始到首个数据点（含）的天数
-            int daysToFirst = nextIdx + 1;
-            return daysToFirst > 0 ? firstVal / daysToFirst : 0.0;
-        }
-        // 在末尾数据点之后：保持最后值
-        if (nextIdx < 0 && prevIdx >= 0) {
-            // 也按日均分摊
-            double lastVal = valAt(allDateKeys, prevIdx, rawData);
-            int daysFromLast = allDateKeys.size() - prevIdx;
-            return daysFromLast > 0 ? lastVal / daysFromLast : 0.0;
-        }
-        if (prevIdx < 0) return 0.0;
+        // 两端无数据点：返回0
+        if (prevIdx < 0 || nextIdx < 0) return 0.0;
         if (prevIdx == nextIdx) return valAt(allDateKeys, prevIdx, rawData);
 
         // 中间：线性插值
