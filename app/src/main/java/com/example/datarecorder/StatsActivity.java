@@ -45,8 +45,8 @@ public class StatsActivity extends AppCompatActivity {
         chartUsage = findViewById(R.id.chart_usage); chartCost = findViewById(R.id.chart_cost);
 
         // 按日/按月
-        ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"按日", "按月"});
-        modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, new String[]{"按日", "按月"});
+        modeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
         spnMode.setAdapter(modeAdapter);
         spnMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { currentMode = pos; refreshCharts(); }
@@ -54,8 +54,8 @@ public class StatsActivity extends AppCompatActivity {
         });
 
         // 时间范围
-        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, RANGE_LABELS);
-        rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, RANGE_LABELS);
+        rangeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
         spnRange.setAdapter(rangeAdapter);
         spnRange.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { currentRange = pos; refreshCharts(); }

@@ -85,8 +85,8 @@ public class MeterDetailActivity extends AppCompatActivity {
 
         // 时间范围选择
         spnRange = findViewById(R.id.spn_range);
-        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, RANGE_LABELS);
-        rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, RANGE_LABELS);
+        rangeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
         spnRange.setAdapter(rangeAdapter);
         spnRange.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { currentRange = pos; applyRangeFilter(); }
