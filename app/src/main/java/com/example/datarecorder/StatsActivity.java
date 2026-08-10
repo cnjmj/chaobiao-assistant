@@ -28,21 +28,24 @@ import java.util.TreeMap;
 
 public class StatsActivity extends AppCompatActivity {
     private long meterId; private DatabaseHelper dbHelper; private Meter meter;
-    private Spinner spnYear, spnMode; private LinearLayout tableContainer;
+    private Spinner spnMode, spnRange; private LinearLayout tableContainer;
     private LineChart chartUsage, chartCost;
     private int currentMode = 0; // 0=按日, 1=按月
+    private int currentRange = 0; // 时间范围索引
+    private static final String[] RANGE_LABELS = {"最近30天", "最近3月", "最近6月", "最近1年", "全部"};
+    // 对应天数: 30天, ~90天, ~180天, ~365天, -1(全部)
+    private static final int[] RANGE_DAYS = {30, 90, 180, 365, -1};
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState); setContentView(R.layout.activity_stats);
         meterId = getIntent().getLongExtra("meter_id", -1); if (meterId <= 0) { finish(); return; }
         dbHelper = new DatabaseHelper(this); meter = dbHelper.getMeter(meterId); if (meter == null) { finish(); return; }
-        spnYear = findViewById(R.id.spn_year); spnMode = findViewById(R.id.spn_mode);
+        spnMode = findViewById(R.id.spn_mode); spnRange = findViewById(R.id.spn_range);
         tableContainer = findViewById(R.id.table_container);
         chartUsage = findViewById(R.id.chart_usage); chartCost = findViewById(R.id.chart_cost);
 
-        // 按日/按月 切换
-        String[] modes = {"按日", "按月"};
-        ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, modes);
+        // 按日/按月
+        ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"按日", "按月"});
         modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spnMode.setAdapter(modeAdapter);
         spnMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -50,70 +53,71 @@ public class StatsActivity extends AppCompatActivity {
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
 
-        // 年份
-        List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
-        int curYear = Calendar.getInstance().get(Calendar.YEAR);
-        final ArrayList<String> years = new ArrayList<>(); years.add("全部");
-        if (!allRecs.isEmpty()) {
-            Calendar cal = Calendar.getInstance(); cal.setTimeInMillis(allRecs.get(allRecs.size()-1).getTimestamp());
-            for (int y = curYear; y >= cal.get(Calendar.YEAR); y--) years.add(String.valueOf(y));
-        } else years.add(String.valueOf(curYear));
-        ArrayAdapter<String> ya = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, years);
-        ya.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spnYear.setAdapter(ya);
-        spnYear.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { refreshCharts(); }
+        // 时间范围
+        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, RANGE_LABELS);
+        rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spnRange.setAdapter(rangeAdapter);
+        spnRange.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { currentRange = pos; refreshCharts(); }
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
         refreshCharts();
     }
 
-    private int getSelectedYear() {
-        String s = spnYear.getSelectedItem().toString();
-        return s.equals("全部") ? -1 : Integer.parseInt(s);
+    /** 获取当前范围的起始时间戳，-1表示全部 */
+    private long getRangeStartMs() {
+        int days = RANGE_DAYS[currentRange];
+        if (days < 0) return -1;
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.DAY_OF_MONTH, -(days - 1));
+        return cal.getTimeInMillis();
     }
 
     private void refreshCharts() {
-        int year = getSelectedYear();
-        if (currentMode == 0) updateDaily(year); else updateMonthly(year);
+        if (currentMode == 0) updateDaily(); else updateMonthly();
     }
 
-    private void updateDaily(int year) {
+    private void updateDaily() {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
 
+        long rangeStart = getRangeStartMs();
         SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
         SimpleDateFormat labelFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
 
-        // 按日期(yyyy-MM-dd)汇总原始数据
+        // 按日期汇总原始数据(受时间范围限制)
         TreeMap<String, Double> rawUsage = new TreeMap<>(), rawCost = new TreeMap<>();
-
-        Calendar cal = Calendar.getInstance();
         for (int i = allRecs.size() - 1; i >= 0; i--) {
             Record r = allRecs.get(i);
-            cal.setTimeInMillis(r.getTimestamp());
-            if (year > 0 && cal.get(Calendar.YEAR) != year) continue;
+            if (rangeStart > 0 && r.getTimestamp() < rangeStart) continue;
             String dateKey = dateFmt.format(r.getTimestamp());
-            if (r.getUsageDiff() > 0) {
-                Double p = rawUsage.get(dateKey);
-                rawUsage.put(dateKey, (p != null ? p : 0) + r.getUsageDiff());
-            }
-            if (r.getCostDiff() > 0) {
-                Double p = rawCost.get(dateKey);
-                rawCost.put(dateKey, (p != null ? p : 0) + r.getCostDiff());
-            }
+            if (r.getUsageDiff() > 0) { Double p = rawUsage.get(dateKey); rawUsage.put(dateKey, (p != null ? p : 0) + r.getUsageDiff()); }
+            if (r.getCostDiff() > 0) { Double p = rawCost.get(dateKey); rawCost.put(dateKey, (p != null ? p : 0) + r.getCostDiff()); }
         }
+        if (rawUsage.isEmpty() && rawCost.isEmpty()) return;
 
-        // 确定日期范围：最近30天
+        // 确定日期范围
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 0); today.set(Calendar.MINUTE, 0);
         today.set(Calendar.SECOND, 0); today.set(Calendar.MILLISECOND, 0);
-        Calendar startCal = (Calendar) today.clone();
-        startCal.add(Calendar.DAY_OF_MONTH, -29); // 含今天共30天
+        Calendar startCal;
+        if (rangeStart > 0) {
+            startCal = Calendar.getInstance();
+            startCal.setTimeInMillis(rangeStart);
+        } else {
+            // 全部: 从最早有数据的日期开始
+            startCal = Calendar.getInstance();
+            startCal.setTimeInMillis(rawUsage.isEmpty() ? rawCost.firstKey().hashCode() : rawUsage.firstKey().hashCode());
+            try {
+                startCal.setTimeInMillis(new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).parse(rawUsage.isEmpty() ? rawCost.firstKey() : rawUsage.firstKey()).getTime());
+            } catch (Exception e) { startCal = (Calendar) today.clone(); startCal.add(Calendar.DAY_OF_MONTH, -29); }
+        }
 
-        // 生成连续30天日期列表（内部key和显示label分开存储）
-        ArrayList<String> allDateKeys = new ArrayList<>();  // yyyy-MM-dd，用于查找rawUsage/rawCost
-        ArrayList<String> allLabels = new ArrayList<>();     // MM/dd，用于图表X轴显示
+        // 生成连续日期列表
+        ArrayList<String> allDateKeys = new ArrayList<>();
+        ArrayList<String> allLabels = new ArrayList<>();
         Calendar cur = (Calendar) startCal.clone();
         while (!cur.after(today)) {
             allDateKeys.add(dateFmt.format(cur.getTime()));
@@ -121,15 +125,13 @@ public class StatsActivity extends AppCompatActivity {
             cur.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        // 插值：找出有数据的日期及其索引
+        // 插值
         ArrayList<Integer> dataIndices = new ArrayList<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             if (rawUsage.containsKey(allDateKeys.get(i)) || rawCost.containsKey(allDateKeys.get(i))) {
                 dataIndices.add(i);
             }
         }
-
-        // 用线性插值填补缺失日期，key用label格式(MM/dd)与allLabels一致
         LinkedHashMap<String, Double> dayUsage = new LinkedHashMap<>(), dayCost = new LinkedHashMap<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             String dk = allDateKeys.get(i);
@@ -138,46 +140,47 @@ public class StatsActivity extends AppCompatActivity {
                 dayUsage.put(label, rawUsage.containsKey(dk) ? rawUsage.get(dk) : 0.0);
                 dayCost.put(label, rawCost.containsKey(dk) ? rawCost.get(dk) : 0.0);
             } else {
-                double iu = interpolateValue(i, dataIndices, allDateKeys, rawUsage);
-                double ic = interpolateValue(i, dataIndices, allDateKeys, rawCost);
-                dayUsage.put(label, iu);
-                dayCost.put(label, ic);
+                dayUsage.put(label, interpolateValue(i, dataIndices, allDateKeys, rawUsage));
+                dayCost.put(label, interpolateValue(i, dataIndices, allDateKeys, rawCost));
             }
         }
 
         buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
     }
 
-    /** 对缺失日期进行线性插值：差值/间隔天数取平均 */
     private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         int prevIdx = -1, nextIdx = -1;
         for (int di : dataIndices) {
             if (di <= missingIdx) prevIdx = di;
             if (di >= missingIdx && nextIdx < 0) nextIdx = di;
         }
-        if (prevIdx < 0 && nextIdx >= 0) return rawData.containsKey(allDateKeys.get(nextIdx)) ? rawData.get(allDateKeys.get(nextIdx)) : 0.0;
-        if (nextIdx < 0 && prevIdx >= 0) return rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
+        if (prevIdx < 0 && nextIdx >= 0) return valAt(allDateKeys, nextIdx, rawData);
+        if (nextIdx < 0 && prevIdx >= 0) return valAt(allDateKeys, prevIdx, rawData);
         if (prevIdx < 0) return 0.0;
-        if (prevIdx == nextIdx) return rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
-        double prevVal = rawData.containsKey(allDateKeys.get(prevIdx)) ? rawData.get(allDateKeys.get(prevIdx)) : 0.0;
-        double nextVal = rawData.containsKey(allDateKeys.get(nextIdx)) ? rawData.get(allDateKeys.get(nextIdx)) : 0.0;
+        if (prevIdx == nextIdx) return valAt(allDateKeys, prevIdx, rawData);
+        double prevVal = valAt(allDateKeys, prevIdx, rawData);
+        double nextVal = valAt(allDateKeys, nextIdx, rawData);
         int gap = nextIdx - prevIdx;
-        if (gap == 0) return prevVal;
-        return prevVal + (nextVal - prevVal) * (missingIdx - prevIdx) / gap;
+        return gap == 0 ? prevVal : prevVal + (nextVal - prevVal) * (missingIdx - prevIdx) / gap;
     }
 
-    private void updateMonthly(int year) {
+    private double valAt(ArrayList<String> keys, int idx, TreeMap<String, Double> data) {
+        String k = keys.get(idx);
+        return data.containsKey(k) ? data.get(k) : 0.0;
+    }
+
+    private void updateMonthly() {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
-        Calendar cal = Calendar.getInstance();
+        long rangeStart = getRangeStartMs();
         TreeMap<String, Double> mUsage = new TreeMap<>(), mCost = new TreeMap<>();
         SimpleDateFormat keyFmt = new SimpleDateFormat("yyyy-MM", Locale.CHINA);
-        for (int i = allRecs.size()-1; i >= 0; i--) {
-            Record r = allRecs.get(i); cal.setTimeInMillis(r.getTimestamp());
-            if (year > 0 && cal.get(Calendar.YEAR) != year) continue;
+        for (int i = allRecs.size() - 1; i >= 0; i--) {
+            Record r = allRecs.get(i);
+            if (rangeStart > 0 && r.getTimestamp() < rangeStart) continue;
             String key = keyFmt.format(r.getTimestamp());
-            if (r.getUsageDiff() > 0) { Double p = mUsage.get(key); mUsage.put(key, (p!=null?p:0)+r.getUsageDiff()); }
-            if (r.getCostDiff() > 0) { Double p = mCost.get(key); mCost.put(key, (p!=null?p:0)+r.getCostDiff()); }
+            if (r.getUsageDiff() > 0) { Double p = mUsage.get(key); mUsage.put(key, (p != null ? p : 0) + r.getUsageDiff()); }
+            if (r.getCostDiff() > 0) { Double p = mCost.get(key); mCost.put(key, (p != null ? p : 0) + r.getCostDiff()); }
         }
         ArrayList<String> labels = new ArrayList<>(mUsage.keySet());
         if (labels.isEmpty()) return;
@@ -186,7 +189,6 @@ public class StatsActivity extends AppCompatActivity {
 
     private void buildChartsAndTable(ArrayList<String> labels, Map<String, Double> usageMap, Map<String, Double> costMap, String usageTitle, String costTitle) {
         double totalU = 0, totalC = 0;
-        // 用量曲线
         ArrayList<Entry> uEntries = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
             double u = usageMap.containsKey(labels.get(i)) ? usageMap.get(labels.get(i)) : 0;
@@ -196,7 +198,6 @@ public class StatsActivity extends AppCompatActivity {
         styleDataSet(uSet, Color.parseColor("#009688"), Color.parseColor("#B2DFDB"), Color.parseColor("#4DB6AC"));
         setupChart(chartUsage, new LineData(uSet), labels, usageTitle);
 
-        // 费用曲线
         ArrayList<Entry> cEntries = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
             double c = costMap.containsKey(labels.get(i)) ? costMap.get(labels.get(i)) : 0;
@@ -206,7 +207,6 @@ public class StatsActivity extends AppCompatActivity {
         styleDataSet(cSet, Color.parseColor("#FF7043"), Color.parseColor("#FFCCBC"), Color.parseColor("#FF8A65"));
         setupChart(chartCost, new LineData(cSet), labels, costTitle);
 
-        // 表格
         buildTable(labels, usageMap, costMap, totalU, totalC);
     }
 

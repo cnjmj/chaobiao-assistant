@@ -38,10 +38,15 @@ public class MeterDetailActivity extends AppCompatActivity {
     private long meterId; private Meter meter; private DatabaseHelper dbHelper;
     private RecyclerView recyclerView; private RecordAdapter adapter;
     private TextView tvSummary, tvInfo, tvEmpty; private FloatingActionButton fabAdd;
+    private Spinner spnRange;
     private List<Record> recordList = new ArrayList<>();
+    private List<Record> allRecordsCache = new ArrayList<>(); // 全部记录缓存
     private List<Meter> allMeters = new ArrayList<>();
     private int currentMeterIndex = 0;
+    private int currentRange = 0;
     private GestureDetector gestureDetector;
+    private static final String[] RANGE_LABELS = {"最近30天", "最近3月", "最近6月", "最近1年", "全部"};
+    private static final int[] RANGE_DAYS = {30, 90, 180, 365, -1};
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState); setContentView(R.layout.activity_meter_detail);
@@ -77,6 +82,16 @@ public class MeterDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_stats).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class).putExtra("meter_id", meterId)));
         findViewById(R.id.btn_edit).setOnClickListener(v -> startActivity(new Intent(this, AddMeterActivity.class).putExtra("edit_id", meterId)));
         findViewById(R.id.btn_export).setOnClickListener(v -> exportRecords());
+
+        // 时间范围选择
+        spnRange = findViewById(R.id.spn_range);
+        ArrayAdapter<String> rangeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, RANGE_LABELS);
+        rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spnRange.setAdapter(rangeAdapter);
+        spnRange.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { currentRange = pos; applyRangeFilter(); }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
 
         // 手势检测：左右滑动切换表计
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -184,25 +199,50 @@ public class MeterDetailActivity extends AppCompatActivity {
     }
 
     private void loadRecords() {
-        // 仅在数据变更时重算diff（脏标记优化）
         if (dbHelper.isDirty(meterId)) {
             dbHelper.recalculateDiffs(meterId);
         }
-        recordList = dbHelper.getRecordsByMeter(meterId); adapter.updateData(recordList);
+        allRecordsCache = dbHelper.getRecordsByMeter(meterId);
+        applyRangeFilter();
+    }
+
+    /** 根据时间范围过滤记录 */
+    private void applyRangeFilter() {
+        long rangeStart = getRangeStartMs();
+        if (rangeStart > 0) {
+            recordList = new ArrayList<>();
+            for (Record r : allRecordsCache) {
+                if (r.getTimestamp() >= rangeStart) recordList.add(r);
+            }
+        } else {
+            recordList = new ArrayList<>(allRecordsCache);
+        }
+        adapter.updateData(recordList);
         tvEmpty.setVisibility(recordList.isEmpty() ? View.VISIBLE : View.GONE);
         tvSummary.setVisibility(recordList.isEmpty() ? View.GONE : View.VISIBLE);
-        if (!recordList.isEmpty()) updateSummary();
+        if (!recordList.isEmpty()) updateSummary(); else tvSummary.setText("");
+    }
+
+    /** 获取当前范围的起始时间戳，-1表示全部 */
+    private long getRangeStartMs() {
+        int days = RANGE_DAYS[currentRange];
+        if (days < 0) return -1;
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.DAY_OF_MONTH, -(days - 1));
+        return cal.getTimeInMillis();
     }
 
     private void updateSummary() {
-        Calendar cal = Calendar.getInstance(); cal.set(Calendar.DAY_OF_MONTH,1); cal.set(Calendar.HOUR_OF_DAY,0); cal.set(Calendar.MINUTE,0); cal.set(Calendar.SECOND,0); cal.set(Calendar.MILLISECOND,0);
-        List<Record> mr = dbHelper.getRecordsByRange(meterId, cal.getTimeInMillis(), System.currentTimeMillis());
-        double mu=0, mc=0; for (Record r : mr) { if(r.getUsageDiff()>0) mu+=r.getUsageDiff(); if(r.getCostDiff()>0) mc+=r.getCostDiff(); }
+        double mu=0, mc=0;
+        for (Record r : recordList) { if(r.getUsageDiff()>0) mu+=r.getUsageDiff(); if(r.getCostDiff()>0) mc+=r.getCostDiff(); }
         Record latest = recordList.get(0);
+        String rangeHint = currentRange < RANGE_LABELS.length - 1 ? RANGE_LABELS[currentRange] : "";
         if (meter.isPrepaid()) {
-            tvSummary.setText(String.format(Locale.CHINA, "余额: %.2f元 | 本月费用: %.2f元 | 用量: %.2f%s | 共%d条", latest.getBalance(), mc, mu, meter.getUnit(), recordList.size()));
+            tvSummary.setText(String.format(Locale.CHINA, "余额: %.2f元 | %s费用: %.2f元 | 用量: %.2f%s | 共%d条", latest.getBalance(), rangeHint, mc, mu, meter.getUnit(), recordList.size()));
         } else {
-            tvSummary.setText(String.format(Locale.CHINA, "读数: %.2f%s | 本月: %.2f%s / %.2f元 | 共%d条", latest.getBalance(), meter.getUnit(), mu, meter.getUnit(), mc, recordList.size()));
+            tvSummary.setText(String.format(Locale.CHINA, "读数: %.2f%s | %s: %.2f%s / %.2f元 | 共%d条", latest.getBalance(), meter.getUnit(), rangeHint, mu, meter.getUnit(), mc, recordList.size()));
         }
     }
 
@@ -301,7 +341,7 @@ public class MeterDetailActivity extends AppCompatActivity {
 
     // 导出记录为CSV
     private void exportRecords() {
-        if (recordList.isEmpty()) { Toast.makeText(this, "暂无记录可导出", Toast.LENGTH_SHORT).show(); return; }
+        if (allRecordsCache.isEmpty()) { Toast.makeText(this, "暂无记录可导出", Toast.LENGTH_SHORT).show(); return; }
         try {
             File exportDir = new File(getExternalFilesDir(null), "export");
             if (!exportDir.exists()) exportDir.mkdirs();
@@ -314,7 +354,7 @@ public class MeterDetailActivity extends AppCompatActivity {
             String balCol = meter.isPrepaid() ? "余额(元)" : "读数(" + meter.getUnit() + ")";
             fw.write("时间,类型," + balCol + ",用量(" + meter.getUnit() + "),费用(元),备注\n");
             // Data (正序：从旧到新)
-            List<Record> sorted = new ArrayList<>(recordList);
+            List<Record> sorted = new ArrayList<>(allRecordsCache);
             Collections.reverse(sorted);
             for (Record r : sorted) {
                 String type = r.isRecharge() ? "充值" : "抄表";
@@ -436,8 +476,8 @@ public class MeterDetailActivity extends AppCompatActivity {
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
 
-        if (!recordList.isEmpty()) {
-            Record last = recordList.get(0);
+        if (!allRecordsCache.isEmpty()) {
+            Record last = allRecordsCache.get(0);
             if (meter.isPrepaid()) tvHint.setText("上次余额: " + last.getFormattedBalance() + " 元 (" + last.getFormattedTime() + ")");
             else tvHint.setText("上次读数: " + last.getFormattedBalance() + " " + meter.getUnit() + " (" + last.getFormattedTime() + ")");
         } else tvHint.setText("这是第一条记录");
