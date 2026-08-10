@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.textfield.TextInputLayout;
 import java.io.File;
@@ -37,12 +38,13 @@ public class MeterDetailActivity extends AppCompatActivity {
     private static final int REQ_DETAIL = 1001;
     private long meterId; private Meter meter; private DatabaseHelper dbHelper;
     private RecyclerView recyclerView; private RecordAdapter adapter;
-    private TextView tvSummary, tvInfo, tvEmpty, tvDateStart, tvDateEnd; private FloatingActionButton fabAdd;
+    private TextView tvSummary, tvInfo, tvEmpty, tvDateRange; private FloatingActionButton fabAdd;
     private List<Record> recordList = new ArrayList<>();
     private List<Record> allRecordsCache = new ArrayList<>();
     private List<Meter> allMeters = new ArrayList<>();
     private int currentMeterIndex = 0;
-    private Calendar rangeStartCal, rangeEndCal;
+    private long rangeStartMs, rangeEndMs;
+    private boolean rangeInitialized = false;
     private GestureDetector gestureDetector;
     private SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
 
@@ -52,7 +54,7 @@ public class MeterDetailActivity extends AppCompatActivity {
         dbHelper = new DatabaseHelper(this);
         recyclerView = findViewById(R.id.recycler_view); tvSummary = findViewById(R.id.tv_summary);
         tvInfo = findViewById(R.id.tv_meter_info); tvEmpty = findViewById(R.id.tv_empty); fabAdd = findViewById(R.id.fab_add);
-        tvDateStart = findViewById(R.id.tv_date_start); tvDateEnd = findViewById(R.id.tv_date_end);
+        tvDateRange = findViewById(R.id.tv_date_range);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new RecordAdapter(recordList, "kWh", true);
         adapter.setOnItemClick((r, pos) -> {
@@ -80,43 +82,8 @@ public class MeterDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_edit).setOnClickListener(v -> startActivity(new Intent(this, AddMeterActivity.class).putExtra("edit_id", meterId)));
         findViewById(R.id.btn_export).setOnClickListener(v -> exportRecords());
 
-        // 起始日期选择
-        tvDateStart.setOnClickListener(v -> {
-            Calendar c = (Calendar) rangeStartCal.clone();
-            DatePickerDialog dpd = new DatePickerDialog(this,
-                (view, year, month, day) -> {
-                    rangeStartCal.set(Calendar.YEAR, year);
-                    rangeStartCal.set(Calendar.MONTH, month);
-                    rangeStartCal.set(Calendar.DAY_OF_MONTH, day);
-                    rangeStartCal.set(Calendar.HOUR_OF_DAY, 0);
-                    rangeStartCal.set(Calendar.MINUTE, 0);
-                    rangeStartCal.set(Calendar.SECOND, 0);
-                    rangeStartCal.set(Calendar.MILLISECOND, 0);
-                    if (rangeStartCal.after(rangeEndCal)) rangeStartCal.setTimeInMillis(rangeEndCal.getTimeInMillis());
-                    updateDateLabels();
-                    applyRangeFilter();
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-            dpd.show();
-        });
-
-        // 结束日期选择
-        tvDateEnd.setOnClickListener(v -> {
-            Calendar c = (Calendar) rangeEndCal.clone();
-            DatePickerDialog dpd = new DatePickerDialog(this,
-                (view, year, month, day) -> {
-                    rangeEndCal.set(Calendar.YEAR, year);
-                    rangeEndCal.set(Calendar.MONTH, month);
-                    rangeEndCal.set(Calendar.DAY_OF_MONTH, day);
-                    rangeEndCal.set(Calendar.HOUR_OF_DAY, 23);
-                    rangeEndCal.set(Calendar.MINUTE, 59);
-                    rangeEndCal.set(Calendar.SECOND, 59);
-                    rangeEndCal.set(Calendar.MILLISECOND, 999);
-                    if (rangeEndCal.before(rangeStartCal)) rangeEndCal.setTimeInMillis(rangeStartCal.getTimeInMillis());
-                    updateDateLabels();
-                    applyRangeFilter();
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-            dpd.show();
-        });
+        // 点击日期范围文本，弹出Material日期范围选择器
+        tvDateRange.setOnClickListener(v -> showDateRangePicker());
 
         // 手势检测：左右滑动切换表计
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -135,31 +102,52 @@ public class MeterDetailActivity extends AppCompatActivity {
         });
     }
 
-    /** 默认范围：最近一次记录所在月份的1号 ~ 今天 */
-    private void initDefaultRange() {
-        rangeEndCal = Calendar.getInstance();
-        rangeEndCal.set(Calendar.HOUR_OF_DAY, 23);
-        rangeEndCal.set(Calendar.MINUTE, 59);
-        rangeEndCal.set(Calendar.SECOND, 59);
-        rangeEndCal.set(Calendar.MILLISECOND, 999);
-
-        rangeStartCal = Calendar.getInstance();
-        if (!allRecordsCache.isEmpty()) {
-            Record latest = allRecordsCache.get(0);
-            rangeStartCal.setTimeInMillis(latest.getTimestamp());
-            rangeStartCal.set(Calendar.DAY_OF_MONTH, 1);
-        } else {
-            rangeStartCal.add(Calendar.DAY_OF_MONTH, -29);
-        }
-        rangeStartCal.set(Calendar.HOUR_OF_DAY, 0);
-        rangeStartCal.set(Calendar.MINUTE, 0);
-        rangeStartCal.set(Calendar.SECOND, 0);
-        rangeStartCal.set(Calendar.MILLISECOND, 0);
+    private void showDateRangePicker() {
+        MaterialDatePicker.Builder<androidx.core.util.Pair<Long, Long>> builder = MaterialDatePicker.Builder.dateRangePicker();
+        builder.setTitleText("选择日期范围");
+        builder.setSelection(new androidx.core.util.Pair<>(rangeStartMs, rangeEndMs));
+        MaterialDatePicker<androidx.core.util.Pair<Long, Long>> picker = builder.build();
+        picker.addOnPositiveButtonClickListener(selection -> {
+            Long start = selection.first;
+            Long end = selection.second;
+            if (start != null && end != null) {
+                rangeStartMs = start;
+                rangeEndMs = end;
+                updateDateLabel();
+                applyRangeFilter();
+            }
+        });
+        picker.show(getSupportFragmentManager(), "DATE_RANGE_PICKER");
     }
 
-    private void updateDateLabels() {
-        tvDateStart.setText(sdfDate.format(rangeStartCal.getTime()));
-        tvDateEnd.setText(sdfDate.format(rangeEndCal.getTime()));
+    private void initDefaultRange() {
+        Calendar endCal = Calendar.getInstance();
+        endCal.set(Calendar.HOUR_OF_DAY, 23);
+        endCal.set(Calendar.MINUTE, 59);
+        endCal.set(Calendar.SECOND, 59);
+        endCal.set(Calendar.MILLISECOND, 999);
+        rangeEndMs = endCal.getTimeInMillis();
+
+        Calendar startCal = Calendar.getInstance();
+        if (!allRecordsCache.isEmpty()) {
+            Record latest = allRecordsCache.get(0);
+            startCal.setTimeInMillis(latest.getTimestamp());
+            startCal.set(Calendar.DAY_OF_MONTH, 1);
+        } else {
+            startCal.add(Calendar.DAY_OF_MONTH, -29);
+        }
+        startCal.set(Calendar.HOUR_OF_DAY, 0);
+        startCal.set(Calendar.MINUTE, 0);
+        startCal.set(Calendar.SECOND, 0);
+        startCal.set(Calendar.MILLISECOND, 0);
+        rangeStartMs = startCal.getTimeInMillis();
+        rangeInitialized = true;
+    }
+
+    private void updateDateLabel() {
+        Calendar sc = Calendar.getInstance(); sc.setTimeInMillis(rangeStartMs);
+        Calendar ec = Calendar.getInstance(); ec.setTimeInMillis(rangeEndMs);
+        tvDateRange.setText(sdfDate.format(sc.getTime()) + " ~ " + sdfDate.format(ec.getTime()));
     }
 
     @Override public boolean dispatchTouchEvent(MotionEvent ev) {
@@ -197,6 +185,7 @@ public class MeterDetailActivity extends AppCompatActivity {
             }).show();
         });
         recyclerView.setAdapter(adapter);
+        rangeInitialized = false;
         loadRecords();
         Toast.makeText(this, meter.getName() + " (" + (newIndex + 1) + "/" + allMeters.size() + ")", Toast.LENGTH_SHORT).show();
     }
@@ -247,20 +236,17 @@ public class MeterDetailActivity extends AppCompatActivity {
             dbHelper.recalculateDiffs(meterId);
         }
         allRecordsCache = dbHelper.getRecordsByMeter(meterId);
-        // 每次重新加载时重置日期范围（首次或切换表计）
-        if (rangeStartCal == null) {
+        if (!rangeInitialized) {
             initDefaultRange();
-            updateDateLabels();
+            updateDateLabel();
         }
         applyRangeFilter();
     }
 
     private void applyRangeFilter() {
-        long rangeStart = rangeStartCal.getTimeInMillis();
-        long rangeEnd = rangeEndCal.getTimeInMillis();
         recordList = new ArrayList<>();
         for (Record r : allRecordsCache) {
-            if (r.getTimestamp() >= rangeStart && r.getTimestamp() <= rangeEnd) recordList.add(r);
+            if (r.getTimestamp() >= rangeStartMs && r.getTimestamp() <= rangeEndMs) recordList.add(r);
         }
         adapter.updateData(recordList);
         tvEmpty.setVisibility(recordList.isEmpty() ? View.VISIBLE : View.GONE);
@@ -272,7 +258,9 @@ public class MeterDetailActivity extends AppCompatActivity {
         double mu=0, mc=0;
         for (Record r : recordList) { if(r.getUsageDiff()>0) mu+=r.getUsageDiff(); if(r.getCostDiff()>0) mc+=r.getCostDiff(); }
         Record latest = recordList.get(0);
-        String dateRange = sdfDate.format(rangeStartCal.getTime()) + "~" + sdfDate.format(rangeEndCal.getTime());
+        Calendar sc = Calendar.getInstance(); sc.setTimeInMillis(rangeStartMs);
+        Calendar ec = Calendar.getInstance(); ec.setTimeInMillis(rangeEndMs);
+        String dateRange = sdfDate.format(sc.getTime()) + "~" + sdfDate.format(ec.getTime());
         if (meter.isPrepaid()) {
             tvSummary.setText(String.format(Locale.CHINA, "余额: %.2f元 | %s费用: %.2f元 | 用量: %.2f%s | 共%d条", latest.getBalance(), dateRange, mc, mu, meter.getUnit(), recordList.size()));
         } else {
@@ -280,7 +268,6 @@ public class MeterDetailActivity extends AppCompatActivity {
         }
     }
 
-    // 编辑记录
     private void showEditDialog(Record r) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL); layout.setPadding(50, 40, 50, 10);
@@ -371,7 +358,6 @@ public class MeterDetailActivity extends AppCompatActivity {
             }).setNegativeButton("取消", null).show();
     }
 
-    // 导出记录为CSV
     private void exportRecords() {
         if (allRecordsCache.isEmpty()) { Toast.makeText(this, "暂无记录可导出", Toast.LENGTH_SHORT).show(); return; }
         try {

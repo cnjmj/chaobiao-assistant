@@ -9,9 +9,7 @@
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="模式：" android:textSize="14sp" android:textColor="#333333"/>
         <Spinner android:id="@+id/spn_mode" android:layout_width="wrap_content" android:layout_height="40dp" android:spinnerMode="dropdown" android:paddingStart="4dp" android:paddingEnd="4dp" android:minWidth="80dp"/>
         <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
-        <TextView android:id="@+id/tv_date_start" android:layout_width="wrap_content" android:layout_height="36dp" android:gravity="center_vertical" android:background="@drawable/bg_date_picker" android:paddingStart="8dp" android:paddingEnd="8dp" android:textSize="13sp" android:textColor="#009688" android:clickable="true" android:focusable="true"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" ~ " android:textSize="13sp" android:textColor="#999999"/>
-        <TextView android:id="@+id/tv_date_end" android:layout_width="wrap_content" android:layout_height="36dp" android:gravity="center_vertical" android:background="@drawable/bg_date_picker" android:paddingStart="8dp" android:paddingEnd="8dp" android:textSize="13sp" android:textColor="#009688" android:clickable="true" android:focusable="true"/>
+        <TextView android:id="@+id/tv_date_range" android:layout_width="wrap_content" android:layout_height="36dp" android:gravity="center_vertical" android:background="@drawable/bg_date_picker" android:paddingStart="8dp" android:paddingEnd="8dp" android:textSize="13sp" android:textColor="#009688" android:clickable="true" android:focusable="true" android:drawableEnd="@android:drawable/ic_menu_month" android:drawablePadding="4dp"/>
     </LinearLayout>
 
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="  用量趋势" android:textSize="14sp" android:textColor="#009688" android:textStyle="bold" android:paddingTop="8dp"/>

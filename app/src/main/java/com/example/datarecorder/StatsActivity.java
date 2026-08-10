@@ -1,6 +1,5 @@
 package com.example.datarecorder;
 
-import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -18,6 +17,9 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.datepicker.DateValidatorPointForward;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -31,9 +33,9 @@ public class StatsActivity extends AppCompatActivity {
     private long meterId; private DatabaseHelper dbHelper; private Meter meter;
     private Spinner spnMode; private LinearLayout tableContainer;
     private LineChart chartUsage, chartCost;
-    private TextView tvDateStart, tvDateEnd;
+    private TextView tvDateRange;
     private int currentMode = 0; // 0=按日, 1=按月
-    private Calendar rangeStartCal, rangeEndCal;
+    private long rangeStartMs, rangeEndMs;
     private SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -43,51 +45,14 @@ public class StatsActivity extends AppCompatActivity {
         spnMode = findViewById(R.id.spn_mode);
         tableContainer = findViewById(R.id.table_container);
         chartUsage = findViewById(R.id.chart_usage); chartCost = findViewById(R.id.chart_cost);
-        tvDateStart = findViewById(R.id.tv_date_start);
-        tvDateEnd = findViewById(R.id.tv_date_end);
+        tvDateRange = findViewById(R.id.tv_date_range);
 
-        // 默认范围：最近一次抄表当月1号 ~ 今天
+        // 默认范围：最近一次记录所在月份的1号 ~ 今天
         initDefaultRange();
+        updateDateLabel();
 
-        // 起始日期选择
-        tvDateStart.setOnClickListener(v -> {
-            Calendar c = (Calendar) rangeStartCal.clone();
-            DatePickerDialog dpd = new DatePickerDialog(this,
-                (view, year, month, day) -> {
-                    rangeStartCal.set(Calendar.YEAR, year);
-                    rangeStartCal.set(Calendar.MONTH, month);
-                    rangeStartCal.set(Calendar.DAY_OF_MONTH, day);
-                    rangeStartCal.set(Calendar.HOUR_OF_DAY, 0);
-                    rangeStartCal.set(Calendar.MINUTE, 0);
-                    rangeStartCal.set(Calendar.SECOND, 0);
-                    rangeStartCal.set(Calendar.MILLISECOND, 0);
-                    // 起始不能晚于结束
-                    if (rangeStartCal.after(rangeEndCal)) rangeStartCal.setTimeInMillis(rangeEndCal.getTimeInMillis());
-                    updateDateLabels();
-                    refreshCharts();
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-            dpd.show();
-        });
-
-        // 结束日期选择
-        tvDateEnd.setOnClickListener(v -> {
-            Calendar c = (Calendar) rangeEndCal.clone();
-            DatePickerDialog dpd = new DatePickerDialog(this,
-                (view, year, month, day) -> {
-                    rangeEndCal.set(Calendar.YEAR, year);
-                    rangeEndCal.set(Calendar.MONTH, month);
-                    rangeEndCal.set(Calendar.DAY_OF_MONTH, day);
-                    rangeEndCal.set(Calendar.HOUR_OF_DAY, 23);
-                    rangeEndCal.set(Calendar.MINUTE, 59);
-                    rangeEndCal.set(Calendar.SECOND, 59);
-                    rangeEndCal.set(Calendar.MILLISECOND, 999);
-                    // 结束不能早于起始
-                    if (rangeEndCal.before(rangeStartCal)) rangeEndCal.setTimeInMillis(rangeStartCal.getTimeInMillis());
-                    updateDateLabels();
-                    refreshCharts();
-                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-            dpd.show();
-        });
+        // 点击日期范围文本，弹出Material日期范围选择器
+        tvDateRange.setOnClickListener(v -> showDateRangePicker());
 
         // 按日/按月
         ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, new String[]{"按日", "按月"});
@@ -98,45 +63,56 @@ public class StatsActivity extends AppCompatActivity {
             @Override public void onNothingSelected(AdapterView<?> p) {}
         });
 
-        updateDateLabels();
         refreshCharts();
+    }
+
+    private void showDateRangePicker() {
+        MaterialDatePicker.Builder<androidx.core.util.Pair<Long, Long>> builder = MaterialDatePicker.Builder.dateRangePicker();
+        builder.setTitleText("选择日期范围");
+        builder.setSelection(new androidx.core.util.Pair<>(rangeStartMs, rangeEndMs));
+        MaterialDatePicker<androidx.core.util.Pair<Long, Long>> picker = builder.build();
+        picker.addOnPositiveButtonClickListener(selection -> {
+            Long start = selection.first;
+            Long end = selection.second;
+            if (start != null && end != null) {
+                rangeStartMs = start;
+                rangeEndMs = end;
+                updateDateLabel();
+                refreshCharts();
+            }
+        });
+        picker.show(getSupportFragmentManager(), "DATE_RANGE_PICKER");
     }
 
     /** 默认范围：最近一次记录所在月份的1号 ~ 今天 */
     private void initDefaultRange() {
-        rangeEndCal = Calendar.getInstance();
-        rangeEndCal.set(Calendar.HOUR_OF_DAY, 23);
-        rangeEndCal.set(Calendar.MINUTE, 59);
-        rangeEndCal.set(Calendar.SECOND, 59);
-        rangeEndCal.set(Calendar.MILLISECOND, 999);
+        Calendar endCal = Calendar.getInstance();
+        endCal.set(Calendar.HOUR_OF_DAY, 23);
+        endCal.set(Calendar.MINUTE, 59);
+        endCal.set(Calendar.SECOND, 59);
+        endCal.set(Calendar.MILLISECOND, 999);
+        rangeEndMs = endCal.getTimeInMillis();
 
-        rangeStartCal = Calendar.getInstance();
+        Calendar startCal = Calendar.getInstance();
         List<Record> recs = dbHelper.getRecordsByMeter(meterId);
         if (!recs.isEmpty()) {
-            // 记录按时间倒序，第一个是最新的
             Record latest = recs.get(0);
-            rangeStartCal.setTimeInMillis(latest.getTimestamp());
-            rangeStartCal.set(Calendar.DAY_OF_MONTH, 1);
+            startCal.setTimeInMillis(latest.getTimestamp());
+            startCal.set(Calendar.DAY_OF_MONTH, 1);
         } else {
-            rangeStartCal.add(Calendar.DAY_OF_MONTH, -29);
+            startCal.add(Calendar.DAY_OF_MONTH, -29);
         }
-        rangeStartCal.set(Calendar.HOUR_OF_DAY, 0);
-        rangeStartCal.set(Calendar.MINUTE, 0);
-        rangeStartCal.set(Calendar.SECOND, 0);
-        rangeStartCal.set(Calendar.MILLISECOND, 0);
+        startCal.set(Calendar.HOUR_OF_DAY, 0);
+        startCal.set(Calendar.MINUTE, 0);
+        startCal.set(Calendar.SECOND, 0);
+        startCal.set(Calendar.MILLISECOND, 0);
+        rangeStartMs = startCal.getTimeInMillis();
     }
 
-    private void updateDateLabels() {
-        tvDateStart.setText(sdfDate.format(rangeStartCal.getTime()));
-        tvDateEnd.setText(sdfDate.format(rangeEndCal.getTime()));
-    }
-
-    private long getRangeStartMs() {
-        return rangeStartCal.getTimeInMillis();
-    }
-
-    private long getRangeEndMs() {
-        return rangeEndCal.getTimeInMillis();
+    private void updateDateLabel() {
+        Calendar sc = Calendar.getInstance(); sc.setTimeInMillis(rangeStartMs);
+        Calendar ec = Calendar.getInstance(); ec.setTimeInMillis(rangeEndMs);
+        tvDateRange.setText(sdfDate.format(sc.getTime()) + " ~ " + sdfDate.format(ec.getTime()));
     }
 
     private void refreshCharts() {
@@ -147,8 +123,6 @@ public class StatsActivity extends AppCompatActivity {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
 
-        long rangeStart = getRangeStartMs();
-        long rangeEnd = getRangeEndMs();
         SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
         SimpleDateFormat labelFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
 
@@ -156,21 +130,17 @@ public class StatsActivity extends AppCompatActivity {
         TreeMap<String, Double> rawUsage = new TreeMap<>(), rawCost = new TreeMap<>();
         for (int i = allRecs.size() - 1; i >= 0; i--) {
             Record r = allRecs.get(i);
-            if (r.getTimestamp() < rangeStart || r.getTimestamp() > rangeEnd) continue;
+            if (r.getTimestamp() < rangeStartMs || r.getTimestamp() > rangeEndMs) continue;
             String dateKey = dateFmt.format(r.getTimestamp());
             if (r.getUsageDiff() > 0) { Double p = rawUsage.get(dateKey); rawUsage.put(dateKey, (p != null ? p : 0) + r.getUsageDiff()); }
             if (r.getCostDiff() > 0) { Double p = rawCost.get(dateKey); rawCost.put(dateKey, (p != null ? p : 0) + r.getCostDiff()); }
         }
         if (rawUsage.isEmpty() && rawCost.isEmpty()) return;
 
-        // 确定日期范围
-        Calendar startCal = Calendar.getInstance();
-        startCal.setTimeInMillis(rangeStart);
-        Calendar endCal = Calendar.getInstance();
-        endCal.setTimeInMillis(rangeEnd);
-        endCal.set(Calendar.HOUR_OF_DAY, 23); endCal.set(Calendar.MINUTE, 59);
-
         // 生成连续日期列表
+        Calendar startCal = Calendar.getInstance(); startCal.setTimeInMillis(rangeStartMs);
+        Calendar endCal = Calendar.getInstance(); endCal.setTimeInMillis(rangeEndMs);
+
         ArrayList<String> allDateKeys = new ArrayList<>();
         ArrayList<String> allLabels = new ArrayList<>();
         Calendar cur = (Calendar) startCal.clone();
@@ -203,16 +173,32 @@ public class StatsActivity extends AppCompatActivity {
         buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
     }
 
+    /** 插值：首条数据之前按日均分摊，中间线性插值，末条之后保持 */
     private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         int prevIdx = -1, nextIdx = -1;
         for (int di : dataIndices) {
             if (di <= missingIdx) prevIdx = di;
             if (di >= missingIdx && nextIdx < 0) nextIdx = di;
         }
-        if (prevIdx < 0 && nextIdx >= 0) return valAt(allDateKeys, nextIdx, rawData);
-        if (nextIdx < 0 && prevIdx >= 0) return valAt(allDateKeys, prevIdx, rawData);
+
+        // 在首个数据点之前：按日均分摊
+        if (prevIdx < 0 && nextIdx >= 0) {
+            double firstVal = valAt(allDateKeys, nextIdx, rawData);
+            // 从范围起始到首个数据点（含）的天数
+            int daysToFirst = nextIdx + 1;
+            return daysToFirst > 0 ? firstVal / daysToFirst : 0.0;
+        }
+        // 在末尾数据点之后：保持最后值
+        if (nextIdx < 0 && prevIdx >= 0) {
+            // 也按日均分摊
+            double lastVal = valAt(allDateKeys, prevIdx, rawData);
+            int daysFromLast = allDateKeys.size() - prevIdx;
+            return daysFromLast > 0 ? lastVal / daysFromLast : 0.0;
+        }
         if (prevIdx < 0) return 0.0;
         if (prevIdx == nextIdx) return valAt(allDateKeys, prevIdx, rawData);
+
+        // 中间：线性插值
         double prevVal = valAt(allDateKeys, prevIdx, rawData);
         double nextVal = valAt(allDateKeys, nextIdx, rawData);
         int gap = nextIdx - prevIdx;
@@ -227,13 +213,11 @@ public class StatsActivity extends AppCompatActivity {
     private void updateMonthly() {
         List<Record> allRecs = dbHelper.getRecordsByMeter(meterId);
         if (allRecs.isEmpty()) return;
-        long rangeStart = getRangeStartMs();
-        long rangeEnd = getRangeEndMs();
         TreeMap<String, Double> mUsage = new TreeMap<>(), mCost = new TreeMap<>();
         SimpleDateFormat keyFmt = new SimpleDateFormat("yyyy-MM", Locale.CHINA);
         for (int i = allRecs.size() - 1; i >= 0; i--) {
             Record r = allRecs.get(i);
-            if (r.getTimestamp() < rangeStart || r.getTimestamp() > rangeEnd) continue;
+            if (r.getTimestamp() < rangeStartMs || r.getTimestamp() > rangeEndMs) continue;
             String key = keyFmt.format(r.getTimestamp());
             if (r.getUsageDiff() > 0) { Double p = mUsage.get(key); mUsage.put(key, (p != null ? p : 0) + r.getUsageDiff()); }
             if (r.getCostDiff() > 0) { Double p = mCost.get(key); mCost.put(key, (p != null ? p : 0) + r.getCostDiff()); }
