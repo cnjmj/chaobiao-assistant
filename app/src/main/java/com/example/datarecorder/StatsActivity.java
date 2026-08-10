@@ -31,10 +31,10 @@ public class StatsActivity extends AppCompatActivity {
     private Spinner spnMode, spnRange; private LinearLayout tableContainer;
     private LineChart chartUsage, chartCost;
     private int currentMode = 0; // 0=按日, 1=按月
-    private int currentRange = 0; // 时间范围索引
-    private static final String[] RANGE_LABELS = {"最近30天", "最近3月", "最近6月", "最近1年", "全部"};
-    // 对应天数: 30天, ~90天, ~180天, ~365天, -1(全部)
-    private static final int[] RANGE_DAYS = {30, 90, 180, 365, -1};
+    private int currentRange = 0; // 时间范围索引，默认"当月"
+    private static final String[] RANGE_LABELS = {"当月", "最近30天", "最近3月", "最近6月", "最近1年", "全部"};
+    // 当月=特殊, 30天, ~90天, ~180天, ~365天, -1(全部)
+    private static final int[] RANGE_DAYS = {0, 30, 90, 180, 365, -1};
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState); setContentView(R.layout.activity_stats);
@@ -68,6 +68,18 @@ public class StatsActivity extends AppCompatActivity {
     private long getRangeStartMs() {
         int days = RANGE_DAYS[currentRange];
         if (days < 0) return -1;
+        if (days == 0) {
+            // "当月": 从最近一条记录所在月份的1号0点开始
+            List<Record> recs = dbHelper.getRecordsByMeter(meterId);
+            if (recs.isEmpty()) return -1;
+            Record latest = recs.get(0); // 最新的在首位
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(latest.getTimestamp());
+            cal.set(Calendar.DAY_OF_MONTH, 1);
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+            return cal.getTimeInMillis();
+        }
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
         cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);

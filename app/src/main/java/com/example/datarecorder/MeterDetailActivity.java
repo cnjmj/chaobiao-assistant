@@ -45,8 +45,8 @@ public class MeterDetailActivity extends AppCompatActivity {
     private int currentMeterIndex = 0;
     private int currentRange = 0;
     private GestureDetector gestureDetector;
-    private static final String[] RANGE_LABELS = {"最近30天", "最近3月", "最近6月", "最近1年", "全部"};
-    private static final int[] RANGE_DAYS = {30, 90, 180, 365, -1};
+    private static final String[] RANGE_LABELS = {"当月", "最近30天", "最近3月", "最近6月", "最近1年", "全部"};
+    private static final int[] RANGE_DAYS = {0, 30, 90, 180, 365, -1};
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState); setContentView(R.layout.activity_meter_detail);
@@ -227,6 +227,19 @@ public class MeterDetailActivity extends AppCompatActivity {
     private long getRangeStartMs() {
         int days = RANGE_DAYS[currentRange];
         if (days < 0) return -1;
+        if (days == 0) {
+            // "当月"：从最新记录所在月份的1号开始
+            if (!allRecordsCache.isEmpty()) {
+                Record latest = allRecordsCache.get(0); // 已按时间倒序
+                Calendar cal = Calendar.getInstance();
+                cal.setTimeInMillis(latest.getTimestamp());
+                cal.set(Calendar.DAY_OF_MONTH, 1);
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
+                return cal.getTimeInMillis();
+            }
+            return -1; // 无记录则显示全部
+        }
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0);
         cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
