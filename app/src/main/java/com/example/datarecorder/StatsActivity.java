@@ -156,7 +156,7 @@ public class StatsActivity extends AppCompatActivity {
             }
         } catch (Exception e) { return; }
 
-        // 插值：仅对两端数据之间的缺失日期线性插值
+        // 插值：仅对两端数据之间的缺失日期做日均分摊，两端不处理
         ArrayList<Integer> dataIndices = new ArrayList<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             if (rawUsage.containsKey(allDateKeys.get(i)) || rawCost.containsKey(allDateKeys.get(i))) {
@@ -179,7 +179,7 @@ public class StatsActivity extends AppCompatActivity {
         buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
     }
 
-    /** 插值：仅对两个数据点之间的缺失日期线性插值，两端不处理 */
+    /** 插值：仅对两个数据点之间的缺失日期做日均分摊，两端不处理 */
     private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         int prevIdx = -1, nextIdx = -1;
         for (int di : dataIndices) {
@@ -191,11 +191,11 @@ public class StatsActivity extends AppCompatActivity {
         if (prevIdx < 0 || nextIdx < 0) return 0.0;
         if (prevIdx == nextIdx) return valAt(allDateKeys, prevIdx, rawData);
 
-        // 中间：线性插值
+        // 中间：日均分摊（相邻两数据点差值均分到每天，缺失日期显示相同日均值）
         double prevVal = valAt(allDateKeys, prevIdx, rawData);
         double nextVal = valAt(allDateKeys, nextIdx, rawData);
         int gap = nextIdx - prevIdx;
-        return gap == 0 ? prevVal : prevVal + (nextVal - prevVal) * (missingIdx - prevIdx) / gap;
+        return gap == 0 ? prevVal : (nextVal - prevVal) / gap;
     }
 
     private double valAt(ArrayList<String> keys, int idx, TreeMap<String, Double> data) {
