@@ -156,51 +156,32 @@ public class StatsActivity extends AppCompatActivity {
             }
         } catch (Exception e) { return; }
 
-        // 插值：仅对两端数据之间的缺失日期做日均分摊，两端不处理
-        ArrayList<Integer> dataIndices = new ArrayList<>();
-        for (int i = 0; i < allDateKeys.size(); i++) {
-            if (rawUsage.containsKey(allDateKeys.get(i)) || rawCost.containsKey(allDateKeys.get(i))) {
-                dataIndices.add(i);
-            }
+        // 所有天统一日均分摊：区间内(首个~末个有数据日)差值均分到每天，有数据那天也取日均值，端点原值以备注形式呈现
+        double avgUsage = 0, avgCost = 0;
+        if (!rawUsage.isEmpty()) {
+            int ui = allDateKeys.indexOf(rawUsage.firstKey()), uj = allDateKeys.indexOf(rawUsage.lastKey());
+            avgUsage = (uj > ui) ? (rawUsage.get(rawUsage.lastKey()) - rawUsage.get(rawUsage.firstKey())) / (uj - ui) : rawUsage.get(rawUsage.firstKey());
         }
+        if (!rawCost.isEmpty()) {
+            int ci = allDateKeys.indexOf(rawCost.firstKey()), cj = allDateKeys.indexOf(rawCost.lastKey());
+            avgCost = (cj > ci) ? (rawCost.get(rawCost.lastKey()) - rawCost.get(rawCost.firstKey())) / (cj - ci) : rawCost.get(rawCost.firstKey());
+        }
+
         LinkedHashMap<String, Double> dayUsage = new LinkedHashMap<>(), dayCost = new LinkedHashMap<>();
+        LinkedHashMap<String, String> originNote = new LinkedHashMap<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             String dk = allDateKeys.get(i);
             String label = allLabels.get(i);
+            dayUsage.put(label, rawUsage.isEmpty() ? 0.0 : avgUsage);
+            dayCost.put(label, rawCost.isEmpty() ? 0.0 : avgCost);
             if (rawUsage.containsKey(dk) || rawCost.containsKey(dk)) {
-                dayUsage.put(label, rawUsage.containsKey(dk) ? rawUsage.get(dk) : 0.0);
-                dayCost.put(label, rawCost.containsKey(dk) ? rawCost.get(dk) : 0.0);
-            } else {
-                dayUsage.put(label, interpolateValue(i, dataIndices, allDateKeys, rawUsage));
-                dayCost.put(label, interpolateValue(i, dataIndices, allDateKeys, rawCost));
+                String u = rawUsage.containsKey(dk) ? String.format(Locale.CHINA, "%.2f", rawUsage.get(dk)) : "-";
+                String c = rawCost.containsKey(dk) ? String.format(Locale.CHINA, "%.2f", rawCost.get(dk)) : "-";
+                originNote.put(label, u + "/" + c);
             }
         }
 
-        buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)");
-    }
-
-    /** 插值：仅对两个数据点之间的缺失日期做日均分摊，两端不处理 */
-    private double interpolateValue(int missingIdx, ArrayList<Integer> dataIndices, ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
-        int prevIdx = -1, nextIdx = -1;
-        for (int di : dataIndices) {
-            if (di <= missingIdx) prevIdx = di;
-            if (di >= missingIdx && nextIdx < 0) nextIdx = di;
-        }
-
-        // 两端无数据点：返回0
-        if (prevIdx < 0 || nextIdx < 0) return 0.0;
-        if (prevIdx == nextIdx) return valAt(allDateKeys, prevIdx, rawData);
-
-        // 中间：日均分摊（相邻两数据点差值均分到每天，缺失日期显示相同日均值）
-        double prevVal = valAt(allDateKeys, prevIdx, rawData);
-        double nextVal = valAt(allDateKeys, nextIdx, rawData);
-        int gap = nextIdx - prevIdx;
-        return gap == 0 ? prevVal : (nextVal - prevVal) / gap;
-    }
-
-    private double valAt(ArrayList<String> keys, int idx, TreeMap<String, Double> data) {
-        String k = keys.get(idx);
-        return data.containsKey(k) ? data.get(k) : 0.0;
+        buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)", originNote);
     }
 
     private void updateMonthly() {
@@ -217,10 +198,10 @@ public class StatsActivity extends AppCompatActivity {
         }
         ArrayList<String> labels = new ArrayList<>(mUsage.keySet());
         if (labels.isEmpty()) return;
-        buildChartsAndTable(labels, mUsage, mCost, "月用量趋势 (" + meter.getUnit() + ")", "月费用趋势 (元)");
+        buildChartsAndTable(labels, mUsage, mCost, "月用量趋势 (" + meter.getUnit() + ")", "月费用趋势 (元)", null);
     }
 
-    private void buildChartsAndTable(ArrayList<String> labels, Map<String, Double> usageMap, Map<String, Double> costMap, String usageTitle, String costTitle) {
+    private void buildChartsAndTable(ArrayList<String> labels, Map<String, Double> usageMap, Map<String, Double> costMap, String usageTitle, String costTitle, Map<String, String> noteMap) {
         double totalU = 0, totalC = 0;
         ArrayList<Entry> uEntries = new ArrayList<>();
         for (int i = 0; i < labels.size(); i++) {
@@ -240,7 +221,7 @@ public class StatsActivity extends AppCompatActivity {
         styleDataSet(cSet, Color.parseColor("#FF7043"), Color.parseColor("#FFCCBC"), Color.parseColor("#FF8A65"));
         setupChart(chartCost, new LineData(cSet), labels, costTitle);
 
-        buildTable(labels, usageMap, costMap, totalU, totalC);
+        buildTable(labels, usageMap, costMap, totalU, totalC, noteMap);
     }
 
     private void styleDataSet(LineDataSet set, int mainColor, int holeColor, int fillColor) {
@@ -264,7 +245,7 @@ public class StatsActivity extends AppCompatActivity {
         chart.animateX(800); chart.invalidate();
     }
 
-    private void buildTable(ArrayList<String> labels, Map<String,Double> uMap, Map<String,Double> cMap, double totalU, double totalC) {
+    private void buildTable(ArrayList<String> labels, Map<String,Double> uMap, Map<String,Double> cMap, double totalU, double totalC, Map<String,String> noteMap) {
         tableContainer.removeAllViews();
         View header = getLayoutInflater().inflate(R.layout.item_table_row, null);
         String periodLabel = currentMode == 0 ? "日期" : "月份";
@@ -276,8 +257,15 @@ public class StatsActivity extends AppCompatActivity {
             View row = getLayoutInflater().inflate(R.layout.item_table_row, null);
             ((TextView)row.findViewById(R.id.tv_col1)).setText(m);
             double u = uMap.containsKey(m) ? uMap.get(m) : 0; double c = cMap.containsKey(m) ? cMap.get(m) : 0;
-            ((TextView)row.findViewById(R.id.tv_col2)).setText(String.format(Locale.CHINA, "%.2f", u));
-            ((TextView)row.findViewById(R.id.tv_col3)).setText(String.format(Locale.CHINA, "%.2f", c));
+            String uText = String.format(Locale.CHINA, "%.2f", u);
+            String cText = String.format(Locale.CHINA, "%.2f", c);
+            String note = noteMap != null ? noteMap.get(m) : null;
+            if (note != null) {
+                String[] parts = note.split("/");
+                uText += " (原" + parts[0] + ")"; cText += " (原" + parts[1] + ")";
+            }
+            ((TextView)row.findViewById(R.id.tv_col2)).setText(uText);
+            ((TextView)row.findViewById(R.id.tv_col3)).setText(cText);
             tableContainer.addView(row);
         }
         View total = getLayoutInflater().inflate(R.layout.item_table_row, null);
