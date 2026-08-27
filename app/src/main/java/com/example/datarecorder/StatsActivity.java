@@ -76,7 +76,14 @@ public class StatsActivity extends AppCompatActivity {
             Long end = selection.second;
             if (start != null && end != null) {
                 rangeStartMs = start;
-                rangeEndMs = end;
+                // 结束时间设为所选日期的24点(23:59:59.999)
+                Calendar ec = Calendar.getInstance();
+                ec.setTimeInMillis(end);
+                ec.set(Calendar.HOUR_OF_DAY, 23);
+                ec.set(Calendar.MINUTE, 59);
+                ec.set(Calendar.SECOND, 59);
+                ec.set(Calendar.MILLISECOND, 999);
+                rangeEndMs = ec.getTimeInMillis();
                 updateDateLabel();
                 refreshCharts();
             }
@@ -156,24 +163,16 @@ public class StatsActivity extends AppCompatActivity {
             }
         } catch (Exception e) { return; }
 
-        // 所有天统一日均分摊：区间内(首个~末个有数据日)差值均分到每天，有数据那天也取日均值，端点原值以备注形式呈现
-        double avgUsage = 0, avgCost = 0;
-        if (!rawUsage.isEmpty()) {
-            int ui = allDateKeys.indexOf(rawUsage.firstKey()), uj = allDateKeys.indexOf(rawUsage.lastKey());
-            avgUsage = (uj > ui) ? (rawUsage.get(rawUsage.lastKey()) - rawUsage.get(rawUsage.firstKey())) / (uj - ui) : rawUsage.get(rawUsage.firstKey());
-        }
-        if (!rawCost.isEmpty()) {
-            int ci = allDateKeys.indexOf(rawCost.firstKey()), cj = allDateKeys.indexOf(rawCost.lastKey());
-            avgCost = (cj > ci) ? (rawCost.get(rawCost.lastKey()) - rawCost.get(rawCost.firstKey())) / (cj - ci) : rawCost.get(rawCost.firstKey());
-        }
+        // 分段日均分摊：每个分段左端点保留原值，右端点及中间缺失天显示该段日均值
+        // 用量和费用各自独立分段
+        LinkedHashMap<String, Double> dayUsage = buildSegmentalAverage(allDateKeys, rawUsage);
+        LinkedHashMap<String, Double> dayCost = buildSegmentalAverage(allDateKeys, rawCost);
 
-        LinkedHashMap<String, Double> dayUsage = new LinkedHashMap<>(), dayCost = new LinkedHashMap<>();
+        // 备注有原始数据的日期
         LinkedHashMap<String, String> originNote = new LinkedHashMap<>();
         for (int i = 0; i < allDateKeys.size(); i++) {
             String dk = allDateKeys.get(i);
             String label = allLabels.get(i);
-            dayUsage.put(label, rawUsage.isEmpty() ? 0.0 : avgUsage);
-            dayCost.put(label, rawCost.isEmpty() ? 0.0 : avgCost);
             if (rawUsage.containsKey(dk) || rawCost.containsKey(dk)) {
                 String u = rawUsage.containsKey(dk) ? String.format(Locale.CHINA, "%.2f", rawUsage.get(dk)) : "-";
                 String c = rawCost.containsKey(dk) ? String.format(Locale.CHINA, "%.2f", rawCost.get(dk)) : "-";
@@ -182,6 +181,64 @@ public class StatsActivity extends AppCompatActivity {
         }
 
         buildChartsAndTable(allLabels, dayUsage, dayCost, "日用量趋势 (" + meter.getUnit() + ")", "日费用趋势 (元)", originNote);
+    }
+
+    /**
+     * 分段日均分摊：有数据日按顺序构成多个分段，每段左端点保留原值，
+     * 右端点及中间缺失天显示该段日均值=(右值-左值)/间隔天数。
+     * 若某天既是上一段右端点又是下一段左端点，作为右端点参与上一段计算（显示上一段日均值），
+     * 不再保留原值。
+     */
+    private LinkedHashMap<String, Double> buildSegmentalAverage(ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
+        LinkedHashMap<String, Double> result = new LinkedHashMap<>();
+        if (rawData.isEmpty()) {
+            for (String dk : allDateKeys) result.put(allDateKeys.indexOf(dk) + "", 0.0);
+            return result;
+        }
+        // 找出有数据的日期在allDateKeys中的索引
+        ArrayList<Integer> dataIdxs = new ArrayList<>();
+        for (String dk : rawData.keySet()) {
+            int idx = allDateKeys.indexOf(dk);
+            if (idx >= 0) dataIdxs.add(idx);
+        }
+        // 初始化所有天为0
+        double[] vals = new double[allDateKeys.size()];
+        // 只有一个数据点：所有天都显示该值
+        if (dataIdxs.size() == 1) {
+            double v = rawData.get(allDateKeys.get(dataIdxs.get(0)));
+            for (int i = 0; i < vals.length; i++) vals[i] = v;
+        } else {
+            // 遍历每一段
+            for (int s = 0; s < dataIdxs.size() - 1; s++) {
+                int li = dataIdxs.get(s);       // 左端点索引
+                int ri = dataIdxs.get(s + 1);   // 右端点索引
+                double lv = rawData.get(allDateKeys.get(li));
+                double rv = rawData.get(allDateKeys.get(ri));
+                int gap = ri - li;
+                double avg = (rv - lv) / gap;
+                // 左端点：仅第一段的左端点保留原值
+                // 后续段的左端点已被上一段作为右端点计算过，保留上一段的日均值
+                if (s == 0) {
+                    vals[li] = lv;
+                }
+                // 右端点及中间天显示该段日均值
+                for (int j = li + 1; j <= ri; j++) {
+                    vals[j] = avg;
+                }
+            }
+        }
+        // 转为LinkedHashMap（用label作key）
+        SimpleDateFormat labelFmt = new SimpleDateFormat("MM/dd", Locale.CHINA);
+        SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd", Locale.CHINA);
+        for (int i = 0; i < allDateKeys.size(); i++) {
+            try {
+                String label = labelFmt.format(dateFmt.parse(allDateKeys.get(i)));
+                result.put(label, vals[i]);
+            } catch (Exception e) {
+                result.put(String.valueOf(i), vals[i]);
+            }
+        }
+        return result;
     }
 
     private void updateMonthly() {
