@@ -184,8 +184,12 @@ public class StatsActivity extends AppCompatActivity {
     }
 
     /**
-     * 分段日均分摊：有数据的天显示原值；缺失的天显示所在分段日均值=(右值-左值)/间隔天数。
-     * 计算日均值时左右端点均取原值。
+     * 分段日均分摊（增量值模式）：
+     * 每条记录的值是自上次抄表以来的增量（如费用5元、40元、60元、160元）。
+     * - 首个数据点：显示原值
+     * - 每段（左端点~右端点）：右端点的增量值 ÷ 间隔天数 = 日均值，
+     *   左端点次日到右端点（含）都显示该日均值
+     * 例：8/1=5, 8/20=40 → 8/2~8/20每天=40/19=2.105263
      */
     private LinkedHashMap<String, Double> buildSegmentalAverage(ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         LinkedHashMap<String, Double> result = new LinkedHashMap<>();
@@ -201,25 +205,21 @@ public class StatsActivity extends AppCompatActivity {
         }
         // 初始化所有天为0
         double[] vals = new double[allDateKeys.size()];
-        // 只有一个数据点：所有天都显示该值
         if (dataIdxs.size() == 1) {
-            double v = rawData.get(allDateKeys.get(dataIdxs.get(0)));
-            for (int i = 0; i < vals.length; i++) vals[i] = v;
+            // 只有一个数据点：显示该值
+            vals[dataIdxs.get(0)] = rawData.get(allDateKeys.get(dataIdxs.get(0)));
         } else {
-            // 有数据的天：显示原值
-            for (int di : dataIdxs) {
-                vals[di] = rawData.get(allDateKeys.get(di));
-            }
-            // 缺失的天：显示所在段日均值（左右端点均取原值计算）
+            // 首个数据点显示原值
+            vals[dataIdxs.get(0)] = rawData.get(allDateKeys.get(dataIdxs.get(0)));
+            // 每段：右端点增量值 ÷ 间隔天数 = 日均值，左端点次日到右端点(含)都显示该值
             for (int s = 0; s < dataIdxs.size() - 1; s++) {
                 int li = dataIdxs.get(s);       // 左端点索引
                 int ri = dataIdxs.get(s + 1);   // 右端点索引
-                double lv = rawData.get(allDateKeys.get(li));  // 左端点原值
-                double rv = rawData.get(allDateKeys.get(ri));  // 右端点原值
-                int gap = ri - li;
-                double avg = (rv - lv) / gap;
-                // 中间缺失天显示该段日均值
-                for (int j = li + 1; j < ri; j++) {
+                double rv = rawData.get(allDateKeys.get(ri));  // 右端点增量值
+                int days = ri - li;             // 间隔天数
+                double avg = rv / days;
+                // 左端点次日到右端点(含)都显示日均值
+                for (int j = li + 1; j <= ri; j++) {
                     vals[j] = avg;
                 }
             }
