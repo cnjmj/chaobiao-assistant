@@ -316,7 +316,14 @@ public class StatsActivity extends AppCompatActivity {
             String note = noteMap != null ? noteMap.get(m) : null;
             if (note != null) {
                 String[] parts = note.split("/");
-                uText += " (原" + parts[0] + ")"; cText += " (原" + parts[1] + ")";
+                // 用量：原值与计算值不等时才备注
+                if (!parts[0].equals("-") && !parts[0].equals(uText)) {
+                    uText += " (原" + parts[0] + ")";
+                }
+                // 费用：原值与计算值不等时才备注
+                if (!parts[1].equals("-") && !parts[1].equals(cText)) {
+                    cText += " (原" + parts[1] + ")";
+                }
             }
             ((TextView)row.findViewById(R.id.tv_col2)).setText(uText);
             ((TextView)row.findViewById(R.id.tv_col3)).setText(cText);
