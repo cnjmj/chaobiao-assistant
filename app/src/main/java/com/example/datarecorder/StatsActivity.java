@@ -184,10 +184,8 @@ public class StatsActivity extends AppCompatActivity {
     }
 
     /**
-     * 分段日均分摊：有数据日按顺序构成多个分段，每段左端点取原值参与计算并显示原值，
-     * 右端点及中间缺失天显示该段日均值=(右值-左值)/间隔天数。
-     * 若某天既是上一段右端点又是下一段左端点，作为左端点取原值参与下一段计算，
-     * 同时显示原值（左端点优先于右端点）。
+     * 分段日均分摊：有数据的天显示原值；缺失的天显示所在分段日均值=(右值-左值)/间隔天数。
+     * 计算日均值时左右端点均取原值。
      */
     private LinkedHashMap<String, Double> buildSegmentalAverage(ArrayList<String> allDateKeys, TreeMap<String, Double> rawData) {
         LinkedHashMap<String, Double> result = new LinkedHashMap<>();
@@ -208,7 +206,11 @@ public class StatsActivity extends AppCompatActivity {
             double v = rawData.get(allDateKeys.get(dataIdxs.get(0)));
             for (int i = 0; i < vals.length; i++) vals[i] = v;
         } else {
-            // 遍历每一段
+            // 有数据的天：显示原值
+            for (int di : dataIdxs) {
+                vals[di] = rawData.get(allDateKeys.get(di));
+            }
+            // 缺失的天：显示所在段日均值（左右端点均取原值计算）
             for (int s = 0; s < dataIdxs.size() - 1; s++) {
                 int li = dataIdxs.get(s);       // 左端点索引
                 int ri = dataIdxs.get(s + 1);   // 右端点索引
@@ -216,10 +218,8 @@ public class StatsActivity extends AppCompatActivity {
                 double rv = rawData.get(allDateKeys.get(ri));  // 右端点原值
                 int gap = ri - li;
                 double avg = (rv - lv) / gap;
-                // 左端点始终显示原值（覆盖上一段可能设的日均值）
-                vals[li] = lv;
-                // 右端点及中间天显示该段日均值
-                for (int j = li + 1; j <= ri; j++) {
+                // 中间缺失天显示该段日均值
+                for (int j = li + 1; j < ri; j++) {
                     vals[j] = avg;
                 }
             }
