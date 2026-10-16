@@ -47,8 +47,8 @@ public class StatsActivity extends AppCompatActivity {
         chartUsage = findViewById(R.id.chart_usage); chartCost = findViewById(R.id.chart_cost);
         tvDateRange = findViewById(R.id.tv_date_range);
 
-        // 默认范围：最近一次记录所在月份的1号 ~ 今天
-        initDefaultRange();
+        // 默认范围：优先使用全局最近一次选择的日期范围，否则用默认
+        if (!loadLastRange()) initDefaultRange();
         updateDateLabel();
 
         // 点击日期范围文本，弹出Material日期范围选择器
@@ -84,11 +84,29 @@ public class StatsActivity extends AppCompatActivity {
                 ec.set(Calendar.SECOND, 59);
                 ec.set(Calendar.MILLISECOND, 999);
                 rangeEndMs = ec.getTimeInMillis();
+                saveLastRange();
                 updateDateLabel();
                 refreshCharts();
             }
         });
         picker.show(getSupportFragmentManager(), "DATE_RANGE_PICKER");
+    }
+
+    /** 保存最近一次选择的日期范围到SharedPreferences（跨表共享） */
+    private void saveLastRange() {
+        getSharedPreferences("date_range_global", MODE_PRIVATE).edit()
+            .putLong("range_start", rangeStartMs)
+            .putLong("range_end", rangeEndMs)
+            .apply();
+    }
+
+    /** 读取最近一次选择的日期范围；无则返回false */
+    private boolean loadLastRange() {
+        android.content.SharedPreferences prefs = getSharedPreferences("date_range_global", MODE_PRIVATE);
+        long s = prefs.getLong("range_start", -1L);
+        long e = prefs.getLong("range_end", -1L);
+        if (s > 0 && e > 0) { rangeStartMs = s; rangeEndMs = e; return true; }
+        return false;
     }
 
     /** 默认范围：最近一次记录所在月份的1号 ~ 今天 */

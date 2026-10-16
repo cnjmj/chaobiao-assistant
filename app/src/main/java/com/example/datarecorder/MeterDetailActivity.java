@@ -113,11 +113,29 @@ public class MeterDetailActivity extends AppCompatActivity {
             if (start != null && end != null) {
                 rangeStartMs = start;
                 rangeEndMs = end;
+                saveLastRange();
                 updateDateLabel();
                 applyRangeFilter();
             }
         });
         picker.show(getSupportFragmentManager(), "DATE_RANGE_PICKER");
+    }
+
+    /** 保存最近一次选择的日期范围到SharedPreferences（跨表共享） */
+    private void saveLastRange() {
+        getSharedPreferences("date_range_global", MODE_PRIVATE).edit()
+            .putLong("range_start", rangeStartMs)
+            .putLong("range_end", rangeEndMs)
+            .apply();
+    }
+
+    /** 读取最近一次选择的日期范围；无则返回false */
+    private boolean loadLastRange() {
+        android.content.SharedPreferences prefs = getSharedPreferences("date_range_global", MODE_PRIVATE);
+        long s = prefs.getLong("range_start", -1L);
+        long e = prefs.getLong("range_end", -1L);
+        if (s > 0 && e > 0) { rangeStartMs = s; rangeEndMs = e; return true; }
+        return false;
     }
 
     private void initDefaultRange() {
@@ -185,7 +203,7 @@ public class MeterDetailActivity extends AppCompatActivity {
             }).show();
         });
         recyclerView.setAdapter(adapter);
-        rangeInitialized = false;
+        // 切换表计时保留最近一次选择的日期范围，不重置
         loadRecords();
         Toast.makeText(this, meter.getName() + " (" + (newIndex + 1) + "/" + allMeters.size() + ")", Toast.LENGTH_SHORT).show();
     }
@@ -237,8 +255,9 @@ public class MeterDetailActivity extends AppCompatActivity {
         }
         allRecordsCache = dbHelper.getRecordsByMeter(meterId);
         if (!rangeInitialized) {
-            initDefaultRange();
+            if (!loadLastRange()) initDefaultRange();
             updateDateLabel();
+            rangeInitialized = true;
         }
         applyRangeFilter();
     }
